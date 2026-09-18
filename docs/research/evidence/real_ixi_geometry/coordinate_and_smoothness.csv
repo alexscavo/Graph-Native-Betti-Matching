@@ -1,0 +1,4 @@
+subject,representation,nodes,edges,fractional_nodes,fractional_node_fraction,training_edge_points
+IXI002-Guys-0828,junction_only,98,130,0,0.0,2
+IXI002-Guys-0828,adaptive,141,173,40,0.28368794326241137,2
+IXI002-Guys-0828,dense,924,956,0,0.0,2

@@ -139,6 +139,22 @@ raw-MRA-supported false-bridge validation in
 [`loop_failure_mitigation.md`](loop_failure_mitigation.md) are implemented and
 reviewed.
 
+### E08 — Real IXI coordinate and patch-budget verification
+
+On a real IXI002 crop, raw voxel-centre paths have a 45.0° median sample-to-sample
+turn angle; constrained smoothing reduces this to 6.6°. Adaptive graph nodes are
+not voxel restricted (28.4% sub-voxel in the crop; 46.5% in the whole-volume
+audit), and every training VTP edge is encoded as a straight two-point line.
+Evidence: [`evidence/real_ixi_geometry/`](evidence/real_ixi_geometry/).
+
+The preliminary whole-volume IXI002 audit finds mean/p95/p99 patch edge counts of
+21.7/63.0/78.6. Five of 175 non-empty patches exceed the preferred 70-edge
+ceiling and one reaches 139, although no patch exceeds 120 nodes. This means the
+typical patch is acceptable but the complexity tail requires topology cleaning
+and/or a budget-aware representation policy. CPU Slurm array job `2141634` is
+pending for the three-representation, three-subject audit. Evidence:
+[`evidence/real_ixi_patch_budget/`](evidence/real_ixi_patch_budget/).
+
 ## Change log
 
 - 2026-09-18: Created the tracker and organized the research documents under

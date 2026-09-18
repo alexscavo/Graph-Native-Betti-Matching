@@ -5,7 +5,8 @@ Emits the layout ``audit_synthetic_mri_grid.discover_sources`` expects::
 
     <output>/raw/<numeric_id>.nii.gz
     <output>/seg/<numeric_id>.nii.gz
-    <output>/graphs/<numeric_id>/{nodes.csv, edges.csv, graph.vvg}
+    <output>/graphs/{junction_only,adaptive,dense}/<numeric_id>/
+        {nodes.csv, edges.csv, graph.vvg}
     <output>/subject_map.csv        numeric id <-> IXI subject, site, spacing, provenance
 
 Subject ids are mapped to integers because the patch generator requires numeric
@@ -39,7 +40,7 @@ import nibabel as nib
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scripts.ixi_vessel_graph import build_vessel_graph, write_source_graph  # noqa: E402
+from scripts.ixi_vessel_graph import build_representation_family, write_source_graph  # noqa: E402
 
 
 DEFAULT_ROOT = Path("/lustre/fsn1/projects/rech/vnc/upz25mj/datasets/IXI_dataset")
@@ -51,6 +52,8 @@ PREFERRED_SEGMENTATIONS = {
     "IXI638-HH-2786": "IXI638-HH-2786-MRA.nii(1).gz",
     "IXI661-HH-2788": "IXI661-HH-2788-MRA.nii(1).gz",
 }
+REPRESENTATION_NAMES = ("junction_only", "adaptive", "dense")
+REPRESENTATION_SCHEMA_VERSION = 2
 
 
 def complete_subjects(root: Path) -> list[str]:
@@ -110,8 +113,19 @@ def load_geometry(root: Path, subject: str):
 def process_subject(subject: str, numeric: int, args: argparse.Namespace) -> dict:
     output = args.output_dir
     marker = output / ".complete" / f"{numeric:06d}.json"
+    representation_outputs = {
+        name: output / "graphs" / name / str(numeric)
+        for name in REPRESENTATION_NAMES
+    }
     if marker.is_file() and not args.force:
-        return {**json.loads(marker.read_text()), "skipped": True}
+        previous = json.loads(marker.read_text())
+        complete = previous.get("representation_schema_version") == REPRESENTATION_SCHEMA_VERSION
+        complete = complete and all(
+            all((directory / filename).is_file() for filename in ("nodes.csv", "edges.csv", "graph.vvg"))
+            for directory in representation_outputs.values()
+        )
+        if complete:
+            return {**previous, "skipped": True}
 
     image, segmentation, brain, affine, spacing, repaired, selected_segmentation = (
         load_geometry(args.root, subject)
@@ -129,17 +143,17 @@ def process_subject(subject: str, numeric: int, args: argparse.Namespace) -> dic
             raw = np.where(keep, raw, 0)
             seg = seg & keep
 
-    graph = build_vessel_graph(
+    graphs = build_representation_family(
         seg,
         spacing=spacing,
+        adaptive_tolerance_mm=args.rdp_voxels * float(spacing.min()),
+        adaptive_radius_fraction=args.radius_fraction,
         spur_length=args.spur_length,
-        rdp_tolerance_mm=args.rdp_voxels * float(spacing.min()),
-        intermediate_nodes=not args.junctions_only,
-        radius_fraction=args.radius_fraction,
         max_junction_extent_mm=args.max_junction_extent_mm,
         smooth_iterations=args.smooth_iterations,
         smooth_alpha=args.smooth_alpha,
     )
+    graph = graphs["adaptive"]
 
     for folder in ("raw", "seg", "graphs"):
         (output / folder).mkdir(parents=True, exist_ok=True)
@@ -151,7 +165,8 @@ def process_subject(subject: str, numeric: int, args: argparse.Namespace) -> dic
         nib.Nifti1Image(np.asarray(seg, dtype=np.uint8), affine),
         str(output / "seg" / f"{numeric}.nii.gz"),
     )
-    write_source_graph(output / "graphs" / str(numeric), graph, affine, seg.shape)
+    for name, representation in graphs.items():
+        write_source_graph(representation_outputs[name], representation, affine, seg.shape)
 
     beta_0, beta_1 = graph.betti()
     degrees = graph.node_degrees
@@ -168,6 +183,18 @@ def process_subject(subject: str, numeric: int, args: argparse.Namespace) -> dic
             if subject in PREFERRED_SEGMENTATIONS
             else "canonical"
         ),
+        "representation_schema_version": REPRESENTATION_SCHEMA_VERSION,
+        "representations": {
+            name: {
+                "nodes": representation.node_count,
+                "edges": representation.edge_count,
+                "degree_2": int((representation.node_degrees == 2).sum()),
+                "beta_0": representation.betti()[0],
+                "beta_1": representation.betti()[1],
+                "directory": str(representation_outputs[name].relative_to(output)),
+            }
+            for name, representation in graphs.items()
+        },
         "vessel_voxels": int(seg.sum()),
         "nodes": graph.node_count,
         "edges": graph.edge_count,
@@ -222,7 +249,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--plan-only", action="store_true")
     parser.add_argument("--max-subjects", type=int)
     parser.add_argument("--brain-mask", choices=("none", "zero"), default="none")
-    parser.add_argument("--junctions-only", action="store_true")
     parser.add_argument("--rdp-voxels", type=float, default=2.0)
     parser.add_argument("--radius-fraction", type=float, default=0.0)
     parser.add_argument("--spur-length", type=int, default=4)

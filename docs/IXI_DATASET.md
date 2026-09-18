@@ -489,10 +489,19 @@ cluster/jean_zay/submit_ixi_patches.sh       stage 2 launcher
 $SCRATCH/datasets/IXI_sources/
 ├── raw/<numeric_id>.nii.gz           float32, repaired affine
 ├── seg/<numeric_id>.nii.gz           uint8
-├── graphs/<numeric_id>/{nodes.csv, edges.csv, graph.vvg}
+├── graphs/
+│   ├── junction_only/<numeric_id>/{nodes.csv, edges.csv, graph.vvg}
+│   ├── adaptive/<numeric_id>/{nodes.csv, edges.csv, graph.vvg}
+│   └── dense/<numeric_id>/{nodes.csv, edges.csv, graph.vvg}
 ├── subject_map.csv                   numeric id <-> IXI subject, site, provenance
 └── .complete/<numeric_id>.json       per-subject marker with counts and Betti numbers
 ```
+
+The three graph directories are separate comparison products generated with the
+same topology settings. They differ only in degree-2 geometry sampling. The
+patch generator automatically selects `graphs/adaptive/` as the compact training
+target; the other representations are evaluation controls until the
+representation study justifies a final choice.
 
 Subject ids map to integers because the patch generator requires numeric patient
 ids (`patient_token`). The mapping is deterministic (sorted subject order) and

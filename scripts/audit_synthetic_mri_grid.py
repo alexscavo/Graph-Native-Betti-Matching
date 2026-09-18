@@ -503,14 +503,23 @@ def _stem_id(path: Path) -> str:
     raise ValueError(f"Unsupported NIfTI name: {path}")
 
 
-def discover_sources(root: Path) -> dict[str, tuple[Path, Path, Path]]:
+def discover_sources(
+    root: Path, graph_variant: str | None = None
+) -> dict[str, tuple[Path, Path, Path]]:
     raw_paths = sorted((root / "raw").glob("*.nii*"))
     seg_paths = sorted((root / "seg").glob("*.nii*"))
     raw = {_stem_id(path): path for path in raw_paths}
     seg = {_stem_id(path): path for path in seg_paths}
+    graph_root = root / "graphs"
+    if graph_variant is not None:
+        graph_root = graph_root / graph_variant
+    elif (graph_root / "adaptive").is_dir():
+        # Multi-representation IXI sources use the adaptive graph as the compact
+        # training target unless a caller explicitly requests another variant.
+        graph_root = graph_root / "adaptive"
     graphs = {
         path.name: path
-        for path in (root / "graphs").iterdir()
+        for path in graph_root.iterdir()
         if path.is_dir()
     }
     union = set(raw) | set(seg) | set(graphs)

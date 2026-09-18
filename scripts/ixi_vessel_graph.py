@@ -451,7 +451,9 @@ def build_vessel_graph(
 
     ``rdp_tolerance_mm`` is a physical bound, converted to voxels per axis using
     ``spacing`` so anisotropic volumes get a consistent geometric guarantee.
-    It is ignored unless ``intermediate_nodes`` is set.
+    It is ignored unless ``intermediate_nodes`` is set. With intermediate nodes
+    enabled, a non-positive tolerance and no radius bound retain every dense
+    centerline sample; this is the dense comparison representation.
     """
 
     from scipy.ndimage import distance_transform_edt
@@ -557,9 +559,7 @@ def build_vessel_graph(
         polyline = smooth_polyline(
             polyline, mask, iterations=smooth_iterations, alpha=smooth_alpha
         )
-        if not intermediate_nodes or len(polyline) < 3 or (
-            tolerance_voxels <= 0 and radius_fraction <= 0
-        ):
+        if not intermediate_nodes or len(polyline) < 3:
             edges.append((node_a, node_b))
             centerlines.append(polyline)
             continue
@@ -631,6 +631,54 @@ def build_vessel_graph(
         pruned_voxels=int(len(dead)),
         ring_count=ring_count,
     )
+
+
+def build_representation_family(
+    segmentation: np.ndarray,
+    *,
+    spacing: Sequence[float] = (1.0, 1.0, 1.0),
+    adaptive_tolerance_mm: float,
+    adaptive_radius_fraction: float = 0.0,
+    **shared_options,
+) -> dict[str, VesselGraph]:
+    """Build the three Phase-1 comparison representations.
+
+    All variants use identical extraction and topology parameters. They differ
+    only in the degree-2 geometry samples retained along each branch:
+
+    - ``junction_only`` retains no degree-2 geometry nodes;
+    - ``adaptive`` retains the minimum RDP-selected geometry nodes;
+    - ``dense`` retains every sample on the smoothed dense centerline.
+
+    Keeping this family in one API prevents comparison scripts from accidentally
+    changing topology parameters between variants.
+    """
+
+    common = dict(shared_options)
+    common["spacing"] = spacing
+    return {
+        "junction_only": build_vessel_graph(
+            segmentation,
+            intermediate_nodes=False,
+            rdp_tolerance_mm=0.0,
+            radius_fraction=0.0,
+            **common,
+        ),
+        "adaptive": build_vessel_graph(
+            segmentation,
+            intermediate_nodes=True,
+            rdp_tolerance_mm=adaptive_tolerance_mm,
+            radius_fraction=adaptive_radius_fraction,
+            **common,
+        ),
+        "dense": build_vessel_graph(
+            segmentation,
+            intermediate_nodes=True,
+            rdp_tolerance_mm=0.0,
+            radius_fraction=0.0,
+            **common,
+        ),
+    }
 
 
 def _drop_small_components(

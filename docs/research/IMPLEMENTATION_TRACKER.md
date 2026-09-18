@@ -259,6 +259,12 @@ patches. A deterministic 15-volume, eight-policy tuning sweep now precedes the
 production extraction. Its design and subset evidence are in
 [`evidence/adaptive_tuning/`](evidence/adaptive_tuning/).
 
+The tuning sweep was submitted as Slurm array job `2161680` (`0-14%4`, one CPU,
+30 minutes per selected volume). It derives all eight policies from one dense
+extraction per volume and writes exact-crop patch-budget statistics. Production
+extraction remains intentionally paused until these results select one global
+policy.
+
 Model-only full-volume adaptive views (straight edges plus every termination,
 degree-2 subdivision, and junction; no centerline polylines) are recorded in
 [`evidence/full_volume_then_crop/adaptive_all_nodes/`](evidence/full_volume_then_crop/adaptive_all_nodes/).

@@ -253,6 +253,12 @@ Full-dataset extraction was submitted as Slurm array job `2161189` with tasks
 skips volumes whose configuration-fingerprinted completion marker and nine
 graph files are present.
 
+Job `2161189` was cancelled while still pending, before any cluster task ran,
+because the strict baseline produced too many degree-2 nodes in the inspected
+patches. A deterministic 15-volume, eight-policy tuning sweep now precedes the
+production extraction. Its design and subset evidence are in
+[`evidence/adaptive_tuning/`](evidence/adaptive_tuning/).
+
 Model-only full-volume adaptive views (straight edges plus every termination,
 degree-2 subdivision, and junction; no centerline polylines) are recorded in
 [`evidence/full_volume_then_crop/adaptive_all_nodes/`](evidence/full_volume_then_crop/adaptive_all_nodes/).

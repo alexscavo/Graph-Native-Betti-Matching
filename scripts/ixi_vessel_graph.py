@@ -381,6 +381,31 @@ def rdp_keep_mask(polyline: np.ndarray, tolerance) -> np.ndarray:
     return keep
 
 
+def adaptive_tolerance_profile(
+    local_radius_mm: np.ndarray,
+    *,
+    radius_fraction: float,
+    minimum_tolerance_mm: float = 0.1,
+) -> np.ndarray:
+    """Return the local RDP tolerance for the radius-aware policy.
+
+    Radius-aware simplification is an alternative to the fixed global tolerance,
+    not a radius-dependent value capped by it.  Capping at the fixed tolerance
+    made thick vessels behave exactly like the global policy and defeated the
+    intended scale adaptation.  The small positive floor only prevents excessive
+    sampling where the discrete distance transform approaches zero.
+    """
+
+    if radius_fraction <= 0:
+        raise ValueError("radius_fraction must be positive for radius-aware RDP")
+    if minimum_tolerance_mm < 0:
+        raise ValueError("minimum_tolerance_mm must be non-negative")
+    radius = np.asarray(local_radius_mm, dtype=np.float64)
+    if np.any(radius < 0) or not np.isfinite(radius).all():
+        raise ValueError("local vessel radii must be finite and non-negative")
+    return np.maximum(radius_fraction * radius, minimum_tolerance_mm)
+
+
 def chord_mask_fraction(
     start: np.ndarray,
     end: np.ndarray,
@@ -731,9 +756,11 @@ def build_vessel_graph(
                 np.rint(polyline).astype(np.int64), 0, np.asarray(mask.shape) - 1
             )
             local = radius_map[voxel[:, 0], voxel[:, 1], voxel[:, 2]]
-            limit = np.maximum(radius_fraction * local, min_tolerance_mm)
-            if rdp_tolerance_mm > 0:
-                limit = np.minimum(limit, rdp_tolerance_mm)
+            limit = adaptive_tolerance_profile(
+                local,
+                radius_fraction=radius_fraction,
+                minimum_tolerance_mm=min_tolerance_mm,
+            )
             keep = rdp_keep_mask(polyline * spacing_array, limit)
         else:
             keep = rdp_keep_mask(polyline * spacing_array, rdp_tolerance_mm)
@@ -1077,12 +1104,28 @@ def derive_graph_from_dense(
     enforce_lumen_containment: bool = True,
     minimum_chord_fraction: float = 1.0,
 ) -> VesselGraph:
-    """Derive one compact representation without repeating skeletonization."""
+    """Derive one compact representation without repeating skeletonization.
+
+    ``adaptive_tolerance_mm`` controls the fixed-tolerance policy.  When
+    ``adaptive_radius_fraction`` is positive, the radius-aware policy replaces
+    that fixed policy: its tolerance is ``max(fraction * local_radius, floor)``.
+    This deliberately permits larger geometric errors in thick vessels while
+    remaining stricter in thin vessels.  Lumen containment is enforced
+    independently after RDP.
+    """
 
     if representation == "dense":
         return dense.graph
     if representation not in {"junction_only", "adaptive"}:
         raise ValueError(f"unknown representation: {representation}")
+    if adaptive_tolerance_mm < 0:
+        raise ValueError("adaptive_tolerance_mm must be non-negative")
+    if adaptive_radius_fraction < 0:
+        raise ValueError("adaptive_radius_fraction must be non-negative")
+    if min_tolerance_mm < 0:
+        raise ValueError("min_tolerance_mm must be non-negative")
+    if not 0.0 <= minimum_chord_fraction <= 1.0:
+        raise ValueError("minimum_chord_fraction must lie in [0, 1]")
     from scipy.ndimage import distance_transform_edt
 
     source = dense.graph
@@ -1118,9 +1161,11 @@ def derive_graph_from_dense(
                     np.asarray(dense.segmentation.shape) - 1,
                 )
                 local = radius_map[voxel[:, 0], voxel[:, 1], voxel[:, 2]]
-                limit = np.maximum(adaptive_radius_fraction * local, min_tolerance_mm)
-                if adaptive_tolerance_mm > 0:
-                    limit = np.minimum(limit, adaptive_tolerance_mm)
+                limit = adaptive_tolerance_profile(
+                    local,
+                    radius_fraction=adaptive_radius_fraction,
+                    minimum_tolerance_mm=min_tolerance_mm,
+                )
             else:
                 limit = adaptive_tolerance_mm
             keep = rdp_keep_mask(polyline * dense.spacing, limit)

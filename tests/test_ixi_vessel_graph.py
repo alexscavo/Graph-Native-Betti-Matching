@@ -6,7 +6,12 @@ import numpy as np
 from unittest.mock import patch
 
 from scripts.audit_synthetic_mri_grid import discover_sources
-from scripts.ixi_vessel_graph import build_representation_family, build_vessel_graph
+from scripts.ixi_vessel_graph import (
+    adaptive_tolerance_profile,
+    build_representation_family,
+    build_vessel_graph,
+    rdp_keep_mask,
+)
 from scripts.prepare_ixi_sources import segmentation_path
 
 
@@ -146,3 +151,36 @@ def test_representation_family_skeletonizes_only_once():
         )
 
     assert mocked.call_count == 1
+
+
+def test_radius_aware_tolerance_is_not_capped_by_fixed_global_tolerance():
+    thin = adaptive_tolerance_profile(
+        np.full(5, 0.5), radius_fraction=0.8, minimum_tolerance_mm=0.1
+    )
+    thick = adaptive_tolerance_profile(
+        np.full(5, 3.0), radius_fraction=0.8, minimum_tolerance_mm=0.1
+    )
+
+    np.testing.assert_allclose(thin, 0.4)
+    np.testing.assert_allclose(thick, 2.4)
+    # The former global value (0.8 mm) must not cap a 2.4-mm thick-vessel rule.
+    assert thick.min() > 0.8
+
+
+def test_radius_aware_rdp_retains_more_geometry_in_thin_than_thick_vessels():
+    polyline = np.asarray(
+        ((0.0, 0.0, 0.0), (1.0, 0.6, 0.0), (2.0, 0.0, 0.0),
+         (3.0, 0.6, 0.0), (4.0, 0.0, 0.0))
+    )
+    thin_limit = adaptive_tolerance_profile(
+        np.full(len(polyline), 0.5), radius_fraction=0.8
+    )
+    thick_limit = adaptive_tolerance_profile(
+        np.full(len(polyline), 3.0), radius_fraction=0.8
+    )
+
+    thin_keep = rdp_keep_mask(polyline, thin_limit)
+    thick_keep = rdp_keep_mask(polyline, thick_limit)
+
+    assert thin_keep.sum() > thick_keep.sum()
+    np.testing.assert_array_equal(thick_keep, (True, False, False, False, True))

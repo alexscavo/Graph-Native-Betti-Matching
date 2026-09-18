@@ -253,6 +253,10 @@ Full-dataset extraction was submitted as Slurm array job `2161189` with tasks
 skips volumes whose configuration-fingerprinted completion marker and nine
 graph files are present.
 
+Model-only full-volume adaptive views (straight edges plus every termination,
+degree-2 subdivision, and junction; no centerline polylines) are recorded in
+[`evidence/full_volume_then_crop/adaptive_all_nodes/`](evidence/full_volume_then_crop/adaptive_all_nodes/).
+
 ## Change log
 
 - 2026-09-18: Created the tracker and organized the research documents under

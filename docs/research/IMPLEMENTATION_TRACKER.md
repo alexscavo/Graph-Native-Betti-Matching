@@ -99,10 +99,11 @@ Data and visualization: [`evidence/T02/`](evidence/T02/).
 
 ### E04 — Three-representation source build
 
-An end-to-end synthetic NIfTI source build emitted nine graph files: the three
+An end-to-end synthetic NIfTI regression build emitted nine graph files: the three
 Voreen files for each of `junction_only`, `adaptive`, and `dense`. The example
 retained identical topology `(beta_0, beta_1) = (1, 0)` while using 2, 4, and 39
-nodes respectively. Data and visualization: [`evidence/T03/`](evidence/T03/).
+nodes respectively. This validates mechanics only; it is not scientific evidence
+for choosing a representation. Data and visualization: [`evidence/T03/`](evidence/T03/).
 
 ### E05 — Dense-reference immutability
 
@@ -111,6 +112,17 @@ voxel-centre centerline while adaptive path samples reflect smoothing. The
 example contains 144 concatenated dense samples, all integer-valued, versus 78
 adaptive path samples with sub-voxel coordinates. Data and visualization:
 [`evidence/T04/`](evidence/T04/).
+
+### E06 — Real IXI three-representation 3D QC
+
+Three real IXI crops cover Guys, HH, and IOP plus both 0.469-mm and 0.264-mm
+in-plane acquisition resolutions. Interactive HTML reports overlay all three
+representations on the real vessel surface. In every crop, beta-0 and beta-1 are
+identical across representations. Adaptive versus dense node counts are 141 vs
+924, 110 vs 807, and 314 vs 2141. This supports compression without topology
+change, but does not yet establish geometric fidelity or resolution invariance.
+Data, regeneration commands, and overview visualization:
+[`evidence/real_ixi/`](evidence/real_ixi/).
 
 ## Change log
 

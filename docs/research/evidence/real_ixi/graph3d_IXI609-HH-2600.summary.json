@@ -1,0 +1,58 @@
+{
+  "radius_fraction": 0.0,
+  "rdp_tolerance_mm": 0.9374999689989015,
+  "representations": {
+    "adaptive": {
+      "beta_0": 3,
+      "beta_1": 24,
+      "degree_2": 42,
+      "edges": 131,
+      "loop_edges": 88,
+      "nodes": 110
+    },
+    "dense": {
+      "beta_0": 3,
+      "beta_1": 24,
+      "degree_2": 739,
+      "edges": 828,
+      "loop_edges": 485,
+      "nodes": 807
+    },
+    "junction_only": {
+      "beta_0": 3,
+      "beta_1": 24,
+      "degree_2": 0,
+      "edges": 89,
+      "loop_edges": 61,
+      "nodes": 68
+    }
+  },
+  "shape_voxels": [
+    90,
+    90,
+    36
+  ],
+  "source": "real IXI segmentation",
+  "spacing_mm": [
+    0.46874998449945077,
+    0.46875000364337627,
+    0.7999999601919849
+  ],
+  "spur_length_voxels": 4,
+  "subject": "IXI609-HH-2600",
+  "vessel_voxels": 19110,
+  "window": [
+    [
+      216,
+      306
+    ],
+    [
+      216,
+      306
+    ],
+    [
+      12,
+      48
+    ]
+  ]
+}

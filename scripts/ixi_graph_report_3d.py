@@ -5,8 +5,9 @@ Renders the vessel surface mesh together with the extracted graph so the two can
 be inspected against each other: centerlines, junctions, terminations and the
 optional curvature-driven degree-2 nodes are separate toggleable layers.
 
-Both graph variants are embedded, so the junctions-only and degree-2 views can be
-compared in the browser without re-running extraction.
+All three Phase-1 graph representations are embedded: junction-only, adaptive,
+and the immutable dense reference. They can be compared in the browser without
+re-running extraction.
 
 A whole 512x512x100 volume produces a mesh far too large to embed, so a dense
 sub-volume is selected by default; pass --full to override at your own risk.
@@ -25,7 +26,8 @@ import nibabel as nib
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scripts.ixi_vessel_graph import build_vessel_graph  # noqa: E402
+from scripts.ixi_vessel_graph import build_representation_family  # noqa: E402
+from scripts.prepare_ixi_sources import segmentation_path  # noqa: E402
 
 
 DEFAULT_ROOT = Path("/lustre/fsn1/projects/rech/vnc/upz25mj/datasets/IXI_dataset")
@@ -34,7 +36,7 @@ DEFAULT_ROOT = Path("/lustre/fsn1/projects/rech/vnc/upz25mj/datasets/IXI_dataset
 def load_subject(root: Path, subject: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Return segmentation, affine and voxel spacing, repairing a stripped header."""
 
-    segmentation = nib.load(str(root / "segmentations" / f"{subject}-MRA.nii.gz"))
+    segmentation = nib.load(str(segmentation_path(root, subject)))
     affine = segmentation.affine
     mask_path = root / "Brain_masks" / f"{subject}-MRA_mask.nii.gz"
     zooms = tuple(round(float(z), 4) for z in segmentation.header.get_zooms())
@@ -238,24 +240,24 @@ def build_report(args: argparse.Namespace) -> Path:
     )
 
     tolerance = args.rdp_voxels * float(spacing.min())
-    sparse = build_vessel_graph(cropped, spacing=spacing, spur_length=args.spur_length)
-    dense = build_vessel_graph(
-        cropped, spacing=spacing, spur_length=args.spur_length,
-        rdp_tolerance_mm=tolerance, intermediate_nodes=True,
-        radius_fraction=args.radius_fraction,
+    graphs = build_representation_family(
+        cropped,
+        spacing=spacing,
+        adaptive_tolerance_mm=tolerance,
+        adaptive_radius_fraction=args.radius_fraction,
+        spur_length=args.spur_length,
     )
-    for trace in graph_traces(
-        dense, spacing, "with degree-2",
-        {"line": "#c0392b", "junction": "#ff7f0e", "termination": "#1f77b4", "degree2": "#2ca02c"},
-        True,
-    ):
-        figure.add_trace(trace)
-    for trace in graph_traces(
-        sparse, spacing, "junctions only",
-        {"line": "#8e44ad", "junction": "#e67e22", "termination": "#2980b9", "degree2": "#27ae60"},
-        "legendonly",
-    ):
-        figure.add_trace(trace)
+    styles = {
+        "adaptive": ({"line": "#c0392b", "junction": "#ff7f0e", "termination": "#1f77b4", "degree2": "#2ca02c"}, True),
+        "junction_only": ({"line": "#8e44ad", "junction": "#e67e22", "termination": "#2980b9", "degree2": "#27ae60"}, "legendonly"),
+        "dense": ({"line": "#008c95", "junction": "#f39c12", "termination": "#2471a3", "degree2": "#00a6a6"}, "legendonly"),
+    }
+    for name in ("adaptive", "junction_only", "dense"):
+        colours, visible = styles[name]
+        for trace in graph_traces(
+            graphs[name], spacing, name.replace("_", " "), colours, visible
+        ):
+            figure.add_trace(trace)
 
     extent = np.asarray(cropped.shape) * spacing
     figure.update_layout(
@@ -268,8 +270,17 @@ def build_report(args: argparse.Namespace) -> Path:
         title=f"{args.subject} — vessel mesh and extracted graph",
     )
 
-    sparse_b0, sparse_b1 = sparse.betti()
-    dense_b0, dense_b1 = dense.betti()
+    graph_summary = {}
+    for name, graph in graphs.items():
+        beta_0, beta_1 = graph.betti()
+        graph_summary[name] = {
+            "nodes": graph.node_count,
+            "edges": graph.edge_count,
+            "degree_2": int((graph.node_degrees == 2).sum()),
+            "beta_0": beta_0,
+            "beta_1": beta_1,
+            "loop_edges": len(loop_edges(graph)[0]),
+        }
     rows = [
         ("subject", args.subject),
         ("region (voxels)", " x ".join(str(s) for s in cropped.shape)),
@@ -277,15 +288,20 @@ def build_report(args: argparse.Namespace) -> Path:
         ("voxel spacing (mm)", " x ".join(f"{s:.3f}" for s in spacing)),
         ("vessel voxels", f"{int(cropped.sum()):,}"),
         ("mesh faces", f"{len(faces):,}"),
-        ("junctions-only: nodes / edges", f"{sparse.node_count} / {sparse.edge_count}"),
-        ("junctions-only: b0 / b1", f"{sparse_b0} / {sparse_b1}"),
-        ("with degree-2: nodes / edges", f"{dense.node_count} / {dense.edge_count}"),
-        ("with degree-2: b0 / b1", f"{dense_b0} / {dense_b1}"),
-        ("edges on a loop (magenta)", f"{len(loop_edges(dense)[0])} of {dense.edge_count}"),
         ("RDP tolerance", f"{args.rdp_voxels} vox = {tolerance:.3f} mm"),
         ("radius-adaptive", f"{args.radius_fraction}x local radius" if args.radius_fraction>0 else "off"),
         ("spur pruning", f"{args.spur_length} voxels"),
     ]
+    for name in ("junction_only", "adaptive", "dense"):
+        item = graph_summary[name]
+        label = name.replace("_", " ")
+        rows.extend(
+            [
+                (f"{label}: nodes / edges", f"{item['nodes']} / {item['edges']}"),
+                (f"{label}: degree-2", item["degree_2"]),
+                (f"{label}: beta-0 / beta-1", f"{item['beta_0']} / {item['beta_1']}"),
+            ]
+        )
     table = "".join(
         f"<tr><th>{html_lib.escape(k)}</th><td>{html_lib.escape(str(v))}</td></tr>"
         for k, v in rows
@@ -306,14 +322,37 @@ def build_report(args: argparse.Namespace) -> Path:
 <h2>IXI vessel graph — {html_lib.escape(args.subject)}</h2>
 <table>{table}</table>
 <p>Drag to rotate, scroll to zoom, right-drag to pan. Click legend entries to toggle
-layers. The magenta <em>highlight loops</em> layer overlays every edge lying on a cycle; turning it off leaves the full edge set intact underneath. The dotted teal <em>centerline</em> layer is the dense skeleton path each edge approximates -- a reference, not the ground truth -- and starts hidden, as does the <em>junctions only</em> group — enable it to compare against
-the degree-2 variant. Hover any node for its id, degree and local vessel radius.</p>
+layers. The adaptive representation starts visible. Enable the junction-only and
+dense groups to compare them against the same vessel surface. The dense graph is
+the raw post-topology-cleanup reference before smoothing and RDP; it is an
+evaluation control, not the selected training target. The magenta
+<em>highlight loops</em> layer overlays edges lying on cycles. Hover any node for
+its id, degree and local vessel radius.</p>
 {plot}
 </body></html>"""
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     destination = args.output_dir / f"graph3d_{args.subject}.html"
     destination.write_text(document)
+    import json
+    summary = {
+        "subject": args.subject,
+        "source": "real IXI segmentation",
+        "window": [
+            [item.start, item.stop] if item.start is not None else [0, int(size)]
+            for item, size in zip(window, volume.shape)
+        ],
+        "shape_voxels": list(cropped.shape),
+        "spacing_mm": [float(value) for value in spacing],
+        "vessel_voxels": int(cropped.sum()),
+        "rdp_tolerance_mm": tolerance,
+        "radius_fraction": args.radius_fraction,
+        "spur_length_voxels": args.spur_length,
+        "representations": graph_summary,
+    }
+    destination.with_suffix(".summary.json").write_text(
+        json.dumps(summary, indent=2, sort_keys=True) + "\n"
+    )
     return destination
 
 

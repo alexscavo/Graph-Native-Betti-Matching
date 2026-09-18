@@ -565,7 +565,7 @@ $SCRATCH/experiments/ixi_qc/
 ```
 
 The interactive report carries independently toggleable layers, for each of the
-junctions-only and degree-2 graph variants:
+junction-only, adaptive, and dense graph variants:
 
 | layer | appearance | default |
 |---|---|---|

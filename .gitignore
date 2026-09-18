@@ -57,6 +57,7 @@ artifacts/
 docs/research/evidence/real_ixi/*.html
 docs/research/evidence/real_ixi_containment/*.html
 docs/research/evidence/real_ixi_vedo/*.html
+docs/research/evidence/new_datasets_baseline/*.html
 wandb/
 lightning_logs/
 tensorboard/

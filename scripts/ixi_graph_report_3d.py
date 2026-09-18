@@ -51,6 +51,18 @@ def load_subject(root: Path, subject: str) -> tuple[np.ndarray, np.ndarray, np.n
     return np.asanyarray(segmentation.dataobj) > 0, affine, spacing
 
 
+def load_paths(segmentation_path_value: Path, geometry_path: Path | None = None):
+    """Load an arbitrary binary or multiclass vessel segmentation."""
+
+    segmentation = nib.load(str(segmentation_path_value))
+    geometry = nib.load(str(geometry_path)) if geometry_path else segmentation
+    if geometry.shape != segmentation.shape:
+        raise ValueError("segmentation and geometry image must have identical shapes")
+    affine = geometry.affine
+    spacing = np.sqrt((affine[:3, :3] ** 2).sum(axis=0))
+    return np.asanyarray(segmentation.dataobj) > 0, affine, spacing
+
+
 def densest_window(
     volume: np.ndarray, half: int, half_z: int, step: int = 12
 ) -> tuple[slice, slice, slice]:
@@ -219,7 +231,12 @@ def build_report(args: argparse.Namespace) -> Path:
     import plotly.graph_objects as go
     from skimage.measure import marching_cubes
 
-    volume, _, spacing = load_subject(args.root, args.subject)
+    if args.segmentation is not None:
+        volume, _, spacing = load_paths(args.segmentation, args.geometry_image)
+        source_description = str(args.segmentation.resolve())
+    else:
+        volume, _, spacing = load_subject(args.root, args.subject)
+        source_description = "real IXI segmentation"
     if args.full:
         window = (slice(None), slice(None), slice(None))
     else:
@@ -249,6 +266,7 @@ def build_report(args: argparse.Namespace) -> Path:
         adaptive_tolerance_mm=tolerance,
         adaptive_radius_fraction=args.radius_fraction,
         spur_length=args.spur_length,
+        centerline_backend=args.centerline_backend,
     )
     styles = {
         "adaptive": ({"line": "#c0392b", "junction": "#ff7f0e", "termination": "#1f77b4", "degree2": "#2ca02c"}, True),
@@ -301,6 +319,7 @@ def build_report(args: argparse.Namespace) -> Path:
         ("RDP tolerance", f"{args.rdp_voxels} vox = {tolerance:.3f} mm"),
         ("radius-adaptive", f"{args.radius_fraction}x local radius" if args.radius_fraction>0 else "off"),
         ("spur pruning", f"{args.spur_length} voxels"),
+        ("centerline backend", args.centerline_backend),
     ]
     for name in ("junction_only", "adaptive", "dense"):
         item = graph_summary[name]
@@ -347,7 +366,8 @@ its id, degree and local vessel radius.</p>
     import json
     summary = {
         "subject": args.subject,
-        "source": "real IXI segmentation",
+        "source": source_description,
+        "centerline_backend": args.centerline_backend,
         "window": [
             [item.start, item.stop] if item.start is not None else [0, int(size)]
             for item, size in zip(window, volume.shape)
@@ -382,6 +402,32 @@ its id, degree and local vessel radius.</p>
     fig.suptitle(f"{args.subject}: three representations from one dense centerline")
     fig.savefig(destination.with_suffix(".png"), dpi=180)
     plt.close(fig)
+
+    # Static 3-D evidence for quick review without opening the interactive HTML.
+    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+    fig3d = plt.figure(figsize=(8, 7), constrained_layout=True)
+    axis3d = fig3d.add_subplot(111, projection="3d")
+    face_stride = max(1, len(faces) // 8_000)
+    surface = Poly3DCollection(
+        vertices[faces[::face_stride]], facecolor="#9fb3c8", edgecolor="none", alpha=0.08
+    )
+    axis3d.add_collection3d(surface)
+    adaptive = graphs["adaptive"]
+    for line in adaptive.centerlines:
+        physical = line * spacing
+        axis3d.plot(physical[:, 0], physical[:, 1], physical[:, 2],
+                    color="#c0392b", linewidth=1.0, alpha=0.9)
+    physical_nodes = adaptive.node_positions * spacing
+    if len(physical_nodes):
+        topological = adaptive.node_degrees != 2
+        axis3d.scatter(*physical_nodes[topological].T, s=7, c="#1f77b4", depthshade=False)
+    axis3d.set(xlim=(0, extent[0]), ylim=(0, extent[1]), zlim=(0, extent[2]),
+               xlabel="x (mm)", ylabel="y (mm)", zlabel="z (mm)")
+    axis3d.set_box_aspect(extent)
+    axis3d.view_init(elev=24, azim=-58)
+    axis3d.set_title(f"{args.subject}: adaptive graph inside vessel surface")
+    fig3d.savefig(destination.with_name(destination.stem + "_overview3d.png"), dpi=180)
+    plt.close(fig3d)
     return destination
 
 
@@ -389,6 +435,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("subject")
     parser.add_argument("--root", type=Path, default=DEFAULT_ROOT)
+    parser.add_argument("--segmentation", type=Path, default=None,
+                        help="arbitrary binary/multiclass vessel label map")
+    parser.add_argument("--geometry-image", type=Path, default=None,
+                        help="optional image supplying trusted affine geometry")
+    parser.add_argument("--centerline-backend", choices=("legacy", "vedo"),
+                        default="legacy")
     parser.add_argument(
         "--output-dir", type=Path,
         default=Path("/lustre/fsn1/projects/rech/vnc/upz25mj/experiments/ixi_qc"),

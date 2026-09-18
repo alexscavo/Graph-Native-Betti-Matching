@@ -194,6 +194,21 @@ remained. The legacy extractor was restored as the default; Vedo is available
 only by explicit selection for reproducibility. See
 [`evidence/real_ixi_vedo/`](evidence/real_ixi_vedo/).
 
+## New IXI and TopBrain restart (2026-09-18)
+
+The rejected Vedo evidence was removed at the user's request, and evaluation
+restarted on newly supplied data using the better pre-Vedo (`legacy`) backend.
+The first subjects are improved-segmentation IXI122 and multiclass TopBrain
+MRA subject 001. Fresh interactive 3-D reports, static 3-D views, measurements
+and densest-64³ patch counts are in
+[`evidence/new_datasets_baseline/`](evidence/new_datasets_baseline/).
+
+Both adaptive representations preserve dense β₀/β₁ and have complete lumen
+containment. Densest 64³ adaptive patches contain 99 IXI edges and 79 TopBrain
+edges: below the 120-token capacity but above the preferred 60–70 range. The
+next dataset-level test must measure percentiles across subjects rather than
+optimizing against these two worst-density patches.
+
 ## Change log
 
 - 2026-09-18: Created the tracker and organized the research documents under

@@ -1,0 +1,68 @@
+{
+  "centerline_backend": "legacy",
+  "radius_fraction": 0.0,
+  "rdp_tolerance_mm": 0.9374998807907104,
+  "representations": {
+    "adaptive": {
+      "beta_0": 14,
+      "beta_1": 104,
+      "degree_2": 1281,
+      "edges": 1720,
+      "loop_edges": 843,
+      "mean_edge_chord_containment": 1.0,
+      "minimum_edge_chord_containment": 1.0,
+      "nodes": 1630,
+      "off_lumen_edge_chords": 0
+    },
+    "dense": {
+      "beta_0": 14,
+      "beta_1": 104,
+      "degree_2": 6611,
+      "edges": 7050,
+      "loop_edges": 3308,
+      "mean_edge_chord_containment": 1.0,
+      "minimum_edge_chord_containment": 1.0,
+      "nodes": 6960,
+      "off_lumen_edge_chords": 0
+    },
+    "junction_only": {
+      "beta_0": 14,
+      "beta_1": 104,
+      "degree_2": 0,
+      "edges": 439,
+      "loop_edges": 295,
+      "mean_edge_chord_containment": 0.6639657161746336,
+      "minimum_edge_chord_containment": 0.02491103202846975,
+      "nodes": 349,
+      "off_lumen_edge_chords": 298
+    }
+  },
+  "shape_voxels": [
+    296,
+    368,
+    100
+  ],
+  "source": "/lustre/fsn1/projects/rech/vnc/upz25mj/datasets/IXI/labelsTr/IXI122-Guys-0773-MRA_IXI-Guys.nii.gz",
+  "spacing_mm": [
+    0.4687499403953552,
+    0.4687499403953552,
+    0.800000011920929
+  ],
+  "spur_length_voxels": 4,
+  "subject": "IXI122-new-full",
+  "vessel_voxels": 67104,
+  "window": [
+    [
+      0,
+      296
+    ],
+    [
+      0,
+      368
+    ],
+    [
+      0,
+      100
+    ]
+  ]
+}

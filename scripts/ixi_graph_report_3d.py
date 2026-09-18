@@ -29,6 +29,7 @@ if __package__ in {None, ""}:
 from scripts.ixi_vessel_graph import (  # noqa: E402
     build_representation_family,
     chord_mask_fraction,
+    write_source_graph,
 )
 from scripts.prepare_ixi_sources import segmentation_path  # noqa: E402
 
@@ -232,10 +233,10 @@ def build_report(args: argparse.Namespace) -> Path:
     from skimage.measure import marching_cubes
 
     if args.segmentation is not None:
-        volume, _, spacing = load_paths(args.segmentation, args.geometry_image)
+        volume, affine, spacing = load_paths(args.segmentation, args.geometry_image)
         source_description = str(args.segmentation.resolve())
     else:
-        volume, _, spacing = load_subject(args.root, args.subject)
+        volume, affine, spacing = load_subject(args.root, args.subject)
         source_description = "real IXI segmentation"
     if args.full:
         window = (slice(None), slice(None), slice(None))
@@ -268,6 +269,14 @@ def build_report(args: argparse.Namespace) -> Path:
         spur_length=args.spur_length,
         centerline_backend=args.centerline_backend,
     )
+    if args.export_graph_root is not None:
+        for representation, graph in graphs.items():
+            write_source_graph(
+                args.export_graph_root / representation / args.subject,
+                graph,
+                affine=affine,
+                shape=volume.shape,
+            )
     styles = {
         "adaptive": ({"line": "#c0392b", "junction": "#ff7f0e", "termination": "#1f77b4", "degree2": "#2ca02c"}, True),
         "junction_only": ({"line": "#8e44ad", "junction": "#e67e22", "termination": "#2980b9", "degree2": "#27ae60"}, "legendonly"),
@@ -441,6 +450,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="optional image supplying trusted affine geometry")
     parser.add_argument("--centerline-backend", choices=("legacy", "vedo"),
                         default="legacy")
+    parser.add_argument("--export-graph-root", type=Path, default=None,
+                        help="write all full-volume representations below this directory")
     parser.add_argument(
         "--output-dir", type=Path,
         default=Path("/lustre/fsn1/projects/rech/vnc/upz25mj/experiments/ixi_qc"),
@@ -459,6 +470,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
+    if args.export_graph_root is not None and not args.full:
+        raise SystemExit("--export-graph-root requires --full so exported coordinates are full-volume")
     destination = build_report(args)
     print(f"Wrote interactive report: {destination} ({destination.stat().st_size/1e6:.1f} MB)")
     return 0

@@ -58,6 +58,7 @@ docs/research/evidence/real_ixi/*.html
 docs/research/evidence/real_ixi_containment/*.html
 docs/research/evidence/real_ixi_vedo/*.html
 docs/research/evidence/new_datasets_baseline/*.html
+docs/research/evidence/full_volume_then_crop/**/*.html
 wandb/
 lightning_logs/
 tensorboard/

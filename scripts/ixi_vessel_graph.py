@@ -1093,7 +1093,11 @@ def derive_graph_from_dense(
     radii = [float(source.node_radii[index]) for index in anchors]
     edges: list[tuple[int, int]] = []
     centerlines: list[np.ndarray] = []
-    radius_map = distance_transform_edt(dense.segmentation, sampling=dense.spacing)
+    radius_map = (
+        distance_transform_edt(dense.segmentation, sampling=dense.spacing)
+        if representation == "adaptive" and adaptive_radius_fraction > 0
+        else None
+    )
 
     for path in paths:
         polyline = source.node_positions[np.asarray(path)].astype(np.float64, copy=True)
@@ -1107,6 +1111,7 @@ def derive_graph_from_dense(
         keep[0] = keep[-1] = True
         if representation == "adaptive" and len(polyline) > 2:
             if adaptive_radius_fraction > 0:
+                assert radius_map is not None
                 voxel = np.clip(
                     np.floor(polyline + 0.5).astype(np.int64),
                     0,
@@ -1130,11 +1135,14 @@ def derive_graph_from_dense(
         for sample_index in retained[1:-1]:
             node = len(positions)
             positions.append(polyline[sample_index].copy())
-            voxel = np.clip(
-                np.floor(polyline[sample_index] + 0.5).astype(np.int64),
-                0, np.asarray(dense.segmentation.shape) - 1,
-            )
-            radii.append(float(radius_map[tuple(voxel)]))
+            if radius_map is None:
+                radii.append(float(source.node_radii[path[int(sample_index)]]))
+            else:
+                voxel = np.clip(
+                    np.floor(polyline[sample_index] + 0.5).astype(np.int64),
+                    0, np.asarray(dense.segmentation.shape) - 1,
+                )
+                radii.append(float(radius_map[tuple(voxel)]))
             edges.append((previous_node, node))
             centerlines.append(polyline[previous_sample : sample_index + 1])
             previous_node, previous_sample = node, int(sample_index)

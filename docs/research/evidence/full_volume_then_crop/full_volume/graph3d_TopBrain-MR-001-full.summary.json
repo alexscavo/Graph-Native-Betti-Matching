@@ -1,0 +1,68 @@
+{
+  "centerline_backend": "legacy",
+  "radius_fraction": 0.0,
+  "rdp_tolerance_mm": 0.5937499827005829,
+  "representations": {
+    "adaptive": {
+      "beta_0": 4,
+      "beta_1": 46,
+      "degree_2": 657,
+      "edges": 881,
+      "loop_edges": 330,
+      "mean_edge_chord_containment": 1.0,
+      "minimum_edge_chord_containment": 1.0,
+      "nodes": 839,
+      "off_lumen_edge_chords": 0
+    },
+    "dense": {
+      "beta_0": 4,
+      "beta_1": 46,
+      "degree_2": 6648,
+      "edges": 6872,
+      "loop_edges": 2422,
+      "mean_edge_chord_containment": 1.0,
+      "minimum_edge_chord_containment": 1.0,
+      "nodes": 6830,
+      "off_lumen_edge_chords": 0
+    },
+    "junction_only": {
+      "beta_0": 4,
+      "beta_1": 46,
+      "degree_2": 0,
+      "edges": 224,
+      "loop_edges": 144,
+      "mean_edge_chord_containment": 0.7067735815198206,
+      "minimum_edge_chord_containment": 0.03283582089552239,
+      "nodes": 182,
+      "off_lumen_edge_chords": 119
+    }
+  },
+  "shape_voxels": [
+    508,
+    585,
+    189
+  ],
+  "source": "/lustre/fsn1/projects/rech/vnc/upz25mj/datasets/TopBrain_Data_Release_Batches1n2_081425/labelsTr_topbrain_mr/topcow_mr_001.nii.gz",
+  "spacing_mm": [
+    0.29687499137624107,
+    0.29687499135029144,
+    0.5999941800165195
+  ],
+  "spur_length_voxels": 4,
+  "subject": "TopBrain-MR-001-full",
+  "vessel_voxels": 289854,
+  "window": [
+    [
+      0,
+      508
+    ],
+    [
+      0,
+      585
+    ],
+    [
+      0,
+      189
+    ]
+  ]
+}

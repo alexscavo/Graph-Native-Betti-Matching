@@ -209,6 +209,15 @@ edges: below the 120-token capacity but above the preferred 60–70 range. The
 next dataset-level test must measure percentiles across subjects rather than
 optimizing against these two worst-density patches.
 
+Those initial counts were produced by cropping the segmentation before graph
+extraction. The corrected evaluation now extracts all three representations on
+the full volume and only then crops the saved adaptive graph. Cropping is done
+in voxel coordinates (important for TopBrain's oblique affine) and uses
+`SourceGraph.crop_inherited()`: a crossing edge terminates at its last existing
+centerline sample inside the patch, without an interpolated box-face node.
+Results and full-volume visualizations are in
+[`evidence/full_volume_then_crop/`](evidence/full_volume_then_crop/).
+
 ## Change log
 
 - 2026-09-18: Created the tracker and organized the research documents under

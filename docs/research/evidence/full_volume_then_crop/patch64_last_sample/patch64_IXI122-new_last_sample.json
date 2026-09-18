@@ -1,0 +1,37 @@
+{
+  "subject": "IXI122-new",
+  "source_graph": "/lustre/fswork/projects/rech/vnc/upz25mj/projects/Graph-Native-Betti-Matching/docs/research/artifacts/full_volume_graphs/adaptive/IXI122-new-full",
+  "segmentation": "/lustre/fsn1/projects/rech/vnc/upz25mj/datasets/IXI/labelsTr/IXI122-Guys-0773-MRA_IXI-Guys.nii.gz",
+  "policy": "full_volume_extraction_then_crop_last_existing_centerline_sample",
+  "creates_interpolated_boundary_nodes": false,
+  "patch_shape": [
+    64,
+    64,
+    64
+  ],
+  "start_voxel": [
+    120,
+    192,
+    0
+  ],
+  "voxel_bounds": [
+    [
+      120,
+      183
+    ],
+    [
+      192,
+      255
+    ],
+    [
+      0,
+      63
+    ]
+  ],
+  "vessel_voxels": 11358,
+  "nodes": 99,
+  "edges": 104,
+  "components": 2,
+  "cycle_rank": 7,
+  "isolated_nodes": 0
+}

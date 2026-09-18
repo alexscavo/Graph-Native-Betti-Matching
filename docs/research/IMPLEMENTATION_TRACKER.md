@@ -124,6 +124,21 @@ change, but does not yet establish geometric fidelity or resolution invariance.
 Data, regeneration commands, and overview visualization:
 [`evidence/real_ixi/`](evidence/real_ixi/).
 
+### E07 — Real IXI bad-loop and chord diagnosis
+
+User 3D inspection exposed dense cycle tangles and off-vessel straight chords.
+Across the three real crops, fixed 2-voxel RDP produced 4, 6, and 3 edges with
+less than 50% chord containment. Radius-normalized RDP reduced these to 0, 2,
+and 3 at radius fraction 0.6, but beta-1 was unchanged for every policy. Thus
+radius adaptation improves geometry but cannot repair segmentation-derived
+topology. Data and visualization:
+[`evidence/real_ixi_loop_diagnosis/`](evidence/real_ixi_loop_diagnosis/).
+
+Training-data generation remains paused until the containment contract and
+raw-MRA-supported false-bridge validation in
+[`loop_failure_mitigation.md`](loop_failure_mitigation.md) are implemented and
+reviewed.
+
 ## Change log
 
 - 2026-09-18: Created the tracker and organized the research documents under

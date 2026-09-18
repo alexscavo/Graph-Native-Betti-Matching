@@ -14,8 +14,10 @@ work that follows the ordered research roadmap.
   validation protocol, and recommended implementation structure.
 - [`IMPLEMENTATION_TRACKER.md`](IMPLEMENTATION_TRACKER.md) — live execution
   record for the roadmap, including decisions, evidence, and blockers.
+- [`loop_failure_mitigation.md`](loop_failure_mitigation.md) — separates
+  off-vessel geometry failures from false topological loops and defines the
+  validation gate before either correction can enter training data.
 
 Dataset-specific extraction decisions remain in
 [`../IXI_DATASET.md`](../IXI_DATASET.md). Repository-wide operational guidance
 remains in [`../repo-graph.md`](../repo-graph.md).
-

@@ -1,0 +1,67 @@
+{
+  "radius_fraction": 0.0,
+  "rdp_tolerance_mm": 0.9374999689989015,
+  "representations": {
+    "adaptive": {
+      "beta_0": 1,
+      "beta_1": 74,
+      "degree_2": 124,
+      "edges": 349,
+      "loop_edges": 252,
+      "mean_edge_chord_containment": 0.9965739285824322,
+      "minimum_edge_chord_containment": 0.8,
+      "nodes": 276,
+      "off_lumen_edge_chords": 7
+    },
+    "dense": {
+      "beta_0": 1,
+      "beta_1": 74,
+      "degree_2": 707,
+      "edges": 932,
+      "loop_edges": 569,
+      "mean_edge_chord_containment": 0.9987170612395587,
+      "minimum_edge_chord_containment": 0.8,
+      "nodes": 859,
+      "off_lumen_edge_chords": 7
+    },
+    "junction_only": {
+      "beta_0": 1,
+      "beta_1": 74,
+      "degree_2": 0,
+      "edges": 225,
+      "loop_edges": 185,
+      "mean_edge_chord_containment": 0.9244085131989956,
+      "minimum_edge_chord_containment": 0.1328125,
+      "nodes": 152,
+      "off_lumen_edge_chords": 47
+    }
+  },
+  "shape_voxels": [
+    90,
+    90,
+    36
+  ],
+  "source": "real IXI segmentation",
+  "spacing_mm": [
+    0.46874998449945077,
+    0.46875000364337627,
+    0.7999999601919849
+  ],
+  "spur_length_voxels": 4,
+  "subject": "IXI609-HH-2600",
+  "vessel_voxels": 19110,
+  "window": [
+    [
+      216,
+      306
+    ],
+    [
+      216,
+      306
+    ],
+    [
+      12,
+      48
+    ]
+  ]
+}

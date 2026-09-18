@@ -180,6 +180,20 @@ The oversized Slurm audit job 2141634 was cancelled before execution. The audit
 request is now one CPU and 30 minutes; no replacement job has been submitted
 while local real-crop validation is sufficient.
 
+## Rejected Vedo dense-centerline backend (2026-09-18)
+
+The historical Vedo extractor was reinterpreted correctly: its dense NetworkX
+sample graph is a centerline intermediate, followed by our compact graph
+extraction. A reusable backend implemented surface-geodesic validation, orphan
+handling, constrained sub-voxel smoothing, local digital-cycle cleanup and the
+usual junction/branch reduction.
+
+Real IXI evidence rejected it. On the IXI002 crop, adaptive complexity worsened
+from 244 nodes / 276 edges / β₁=37 to 363 / 411 / β₁=49, and visual tangles
+remained. The legacy extractor was restored as the default; Vedo is available
+only by explicit selection for reproducibility. See
+[`evidence/real_ixi_vedo/`](evidence/real_ixi_vedo/).
+
 ## Change log
 
 - 2026-09-18: Created the tracker and organized the research documents under

@@ -1,0 +1,67 @@
+{
+  "radius_fraction": 0.0,
+  "rdp_tolerance_mm": 0.9374999999999999,
+  "representations": {
+    "adaptive": {
+      "beta_0": 1,
+      "beta_1": 49,
+      "degree_2": 171,
+      "edges": 411,
+      "loop_edges": 230,
+      "mean_edge_chord_containment": 1.0,
+      "minimum_edge_chord_containment": 1.0,
+      "nodes": 363,
+      "off_lumen_edge_chords": 0
+    },
+    "dense": {
+      "beta_0": 1,
+      "beta_1": 49,
+      "degree_2": 842,
+      "edges": 1082,
+      "loop_edges": 516,
+      "mean_edge_chord_containment": 1.0,
+      "minimum_edge_chord_containment": 1.0,
+      "nodes": 1034,
+      "off_lumen_edge_chords": 0
+    },
+    "junction_only": {
+      "beta_0": 1,
+      "beta_1": 49,
+      "degree_2": 0,
+      "edges": 240,
+      "loop_edges": 158,
+      "mean_edge_chord_containment": 0.9114148145079316,
+      "minimum_edge_chord_containment": 0.09836065573770492,
+      "nodes": 192,
+      "off_lumen_edge_chords": 66
+    }
+  },
+  "shape_voxels": [
+    90,
+    90,
+    36
+  ],
+  "source": "real IXI segmentation",
+  "spacing_mm": [
+    0.46874999999999994,
+    0.46875,
+    0.7999997735023499
+  ],
+  "spur_length_voxels": 4,
+  "subject": "IXI002-Guys-0828",
+  "vessel_voxels": 20046,
+  "window": [
+    [
+      216,
+      306
+    ],
+    [
+      216,
+      306
+    ],
+    [
+      12,
+      48
+    ]
+  ]
+}

@@ -56,6 +56,7 @@ artifacts/
 # several MB each. Track their compact JSON/CSV/PNG evidence, not bundled JS.
 docs/research/evidence/real_ixi/*.html
 docs/research/evidence/real_ixi_containment/*.html
+docs/research/evidence/real_ixi_vedo/*.html
 wandb/
 lightning_logs/
 tensorboard/

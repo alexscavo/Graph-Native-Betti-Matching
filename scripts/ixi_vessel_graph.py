@@ -800,26 +800,200 @@ def build_vessel_graph(
     )
 
 
+def _extract_graph_topology_from_dense(
+    source: VesselGraph,
+    spacing: np.ndarray,
+    *,
+    spur_length: int = 4,
+    max_artifact_self_loop: int = 4,
+    max_junction_extent_mm: float = 1.5,
+) -> VesselGraph:
+    """Convert a refined dense sample network into topology-clean branch paths."""
+
+    adjacency: list[list[int]] = [[] for _ in range(source.node_count)]
+    for left, right in source.edges:
+        adjacency[left].append(right)
+        adjacency[right].append(left)
+    dead = _prune_spurs(adjacency, spur_length)
+    cluster_of, clusters = _cluster_junctions(
+        adjacency, dead, source.node_positions, spacing, max_junction_extent_mm
+    )
+    degree = {
+        node: sum(neighbour not in dead for neighbour in adjacency[node])
+        for node in range(source.node_count) if node not in dead
+    }
+    positions: list[np.ndarray] = []
+    radii: list[float] = []
+    representatives: list[int] = []
+    anchor_of: dict[int, int] = {}
+    for members in clusters:
+        member_points = source.node_positions[np.asarray(members)]
+        centre = member_points.mean(axis=0)
+        representative = members[int(np.argmin(np.linalg.norm(
+            (member_points - centre) * spacing, axis=1
+        )))]
+        anchor = len(positions)
+        positions.append(source.node_positions[representative].copy())
+        radii.append(float(source.node_radii[representative]))
+        representatives.append(representative)
+        for member in members:
+            anchor_of[member] = anchor
+    for node, value in sorted(degree.items()):
+        if value == 1:
+            anchor_of[node] = len(positions)
+            positions.append(source.node_positions[node].copy())
+            radii.append(float(source.node_radii[node]))
+            representatives.append(node)
+
+    branches, rings = _branch_polylines(adjacency, dead, anchor_of)
+    for ring in rings:
+        split = (0, len(ring) // 3, (2 * len(ring)) // 3)
+        ring_nodes = []
+        for index in split:
+            node = ring[index]
+            ring_nodes.append(len(positions))
+            positions.append(source.node_positions[node].copy())
+            radii.append(float(source.node_radii[node]))
+            representatives.append(node)
+        for part in range(3):
+            begin, end = split[part], split[(part + 1) % 3]
+            path = ring[begin : end + 1] if part < 2 else ring[begin:] + [ring[0]]
+            branches.append((ring_nodes[part], ring_nodes[(part + 1) % 3], path))
+    branches = [
+        branch for branch in branches
+        if branch[0] != branch[1] or len(branch[2]) > max_artifact_self_loop
+    ]
+
+    def cluster_route(start: int, target: int, anchor: int) -> list[int]:
+        if start == target:
+            return [start]
+        previous: dict[int, int | None] = {start: None}
+        queue = deque([start])
+        while queue and target not in previous:
+            current = queue.popleft()
+            for neighbour in adjacency[current]:
+                if neighbour in previous or anchor_of.get(neighbour) != anchor:
+                    continue
+                previous[neighbour] = current
+                queue.append(neighbour)
+        if target not in previous:
+            return [start, target]
+        route = [target]
+        while route[-1] != start:
+            parent = previous[route[-1]]
+            if parent is None:
+                break
+            route.append(parent)
+        return list(reversed(route))
+
+    edges: list[tuple[int, int]] = []
+    centerlines: list[np.ndarray] = []
+    for node_a, node_b, path in branches:
+        prefix = cluster_route(representatives[node_a], path[0], node_a)
+        suffix = cluster_route(path[-1], representatives[node_b], node_b)
+        path = prefix[:-1] + path + suffix[1:]
+        polyline = source.node_positions[np.asarray(path)].copy()
+        polyline[0], polyline[-1] = positions[node_a], positions[node_b]
+        previous_node = node_a
+        for sample_index in range(1, len(polyline) - 1):
+            node = len(positions)
+            positions.append(polyline[sample_index])
+            source_node = path[sample_index]
+            radii.append(float(source.node_radii[source_node]))
+            representatives.append(source_node)
+            edges.append((previous_node, node))
+            centerlines.append(polyline[sample_index - 1 : sample_index + 1])
+            previous_node = node
+        edges.append((previous_node, node_b))
+        centerlines.append(polyline[-2:])
+    node_positions = np.asarray(positions, dtype=np.float64).reshape(-1, 3)
+    degrees = np.zeros(len(node_positions), dtype=np.int64)
+    for left, right in edges:
+        degrees[left] += 1
+        degrees[right] += 1
+    return VesselGraph(
+        node_positions=node_positions,
+        node_degrees=degrees,
+        edges=edges,
+        centerlines=centerlines,
+        node_radii=np.asarray(radii),
+        skeleton_voxels=source.skeleton_voxels,
+        pruned_voxels=len(dead),
+        ring_count=len(rings),
+    )
+
+
 def extract_dense_centerline(
     segmentation: np.ndarray,
     *,
     spacing: Sequence[float] = (1.0, 1.0, 1.0),
+    centerline_backend: str = "legacy",
     **topology_options,
 ) -> DenseCenterline:
-    """Extract topology once and retain every post-cleanup centerline sample."""
+    """Extract topology once and retain every post-cleanup centerline sample.
+
+    ``legacy`` remains the production baseline. ``vedo`` is retained only as a
+    rejected experimental control: real IXI evidence showed substantially worse
+    cycle and graph complexity, so it must never be selected implicitly.
+    """
 
     options = dict(topology_options)
     options.pop("smooth_iterations", None)
     options.pop("smooth_alpha", None)
-    graph = build_vessel_graph(
-        segmentation,
-        spacing=spacing,
-        intermediate_nodes=True,
-        rdp_tolerance_mm=0.0,
-        radius_fraction=0.0,
-        smooth_iterations=0,
-        **options,
-    )
+    if centerline_backend == "vedo":
+        from scripts.vedo_centerline import extract_vedo_centerline
+
+        minimum_component_nodes = int(options.pop("min_component_voxels", 7))
+        spur_length = int(options.pop("spur_length", 4))
+        max_artifact_self_loop = int(options.pop("max_artifact_self_loop", 4))
+        max_junction_extent_mm = float(options.pop("max_junction_extent_mm", 1.5))
+        refined = extract_vedo_centerline(
+            segmentation,
+            spacing=spacing,
+            minimum_component_nodes=minimum_component_nodes,
+            **options,
+        )
+        degrees = np.zeros(len(refined.positions), dtype=np.int64)
+        for left, right in refined.edges:
+            degrees[left] += 1
+            degrees[right] += 1
+        refined_graph = VesselGraph(
+            node_positions=refined.positions,
+            node_degrees=degrees,
+            edges=refined.edges,
+            centerlines=[refined.positions[np.asarray(edge)] for edge in refined.edges],
+            node_radii=refined.radii_mm,
+            skeleton_voxels=refined.raw_skeleton_voxels,
+            pruned_voxels=refined.removed_small_nodes,
+        )
+        graph = _extract_graph_topology_from_dense(
+            refined_graph,
+            np.asarray(spacing, dtype=np.float64),
+            spur_length=spur_length,
+            max_artifact_self_loop=max_artifact_self_loop,
+            max_junction_extent_mm=max_junction_extent_mm,
+        )
+        provenance = {
+            **refined.provenance,
+            "removed_triangle_edges": refined.removed_triangle_edges,
+            "removed_local_redundant_edges": refined.removed_local_redundant_edges,
+            "removed_invalid_edges": refined.removed_invalid_edges,
+            "orphan_candidates": refined.orphan_candidates,
+            "orphan_nodes_added": refined.orphan_nodes_added,
+        }
+    elif centerline_backend == "legacy":
+        graph = build_vessel_graph(
+            segmentation,
+            spacing=spacing,
+            intermediate_nodes=True,
+            rdp_tolerance_mm=0.0,
+            radius_fraction=0.0,
+            smooth_iterations=0,
+            **options,
+        )
+        provenance = {"backend": "legacy_skimage_graph_reduction"}
+    else:
+        raise ValueError(f"unknown centerline backend: {centerline_backend}")
     mask = np.asarray(segmentation, dtype=bool).copy()
     mask.setflags(write=False)
     spacing_array = np.asarray(spacing, dtype=np.float64).copy()
@@ -829,7 +1003,7 @@ def extract_dense_centerline(
         segmentation=mask,
         spacing=spacing_array,
         provenance={
-            "backend": "skimage_skeletonize_3d",
+            **provenance,
             "skeleton_voxels": graph.skeleton_voxels,
             "pruned_voxels": graph.pruned_voxels,
             "topology_options": options,
@@ -990,6 +1164,7 @@ def build_representation_family(
     spacing: Sequence[float] = (1.0, 1.0, 1.0),
     adaptive_tolerance_mm: float,
     adaptive_radius_fraction: float = 0.0,
+    centerline_backend: str = "legacy",
     enforce_lumen_containment: bool = True,
     minimum_chord_fraction: float = 1.0,
     **shared_options,
@@ -1012,7 +1187,12 @@ def build_representation_family(
     smooth_iterations = int(common.pop("smooth_iterations", 5))
     smooth_alpha = float(common.pop("smooth_alpha", 0.5))
     min_tolerance_mm = float(common.pop("min_tolerance_mm", 0.1))
-    dense = extract_dense_centerline(segmentation, spacing=spacing, **common)
+    dense = extract_dense_centerline(
+        segmentation,
+        spacing=spacing,
+        centerline_backend=centerline_backend,
+        **common,
+    )
     derivation = dict(
         smooth_iterations=smooth_iterations,
         smooth_alpha=smooth_alpha,

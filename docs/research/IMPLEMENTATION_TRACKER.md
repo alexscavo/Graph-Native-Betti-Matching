@@ -247,6 +247,12 @@ The Jean Zay launcher uses one CPU and partition-default memory per volume,
 a 20-minute walltime, and an array concurrency cap of 12. Explicit `--mem` is
 not valid on Jean Zay and is intentionally omitted.
 
+Full-dataset extraction was submitted as Slurm array job `2161189` with tasks
+`0-219%12`. Outputs are written below
+`docs/research/artifacts/real_graph_dataset/`; rerunning the launcher safely
+skips volumes whose configuration-fingerprinted completion marker and nine
+graph files are present.
+
 ## Change log
 
 - 2026-09-18: Created the tracker and organized the research documents under

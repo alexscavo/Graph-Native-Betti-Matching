@@ -55,6 +55,7 @@ artifacts/
 # Self-contained Plotly QC reports are regenerated from real IXI data and are
 # several MB each. Track their compact JSON/CSV/PNG evidence, not bundled JS.
 docs/research/evidence/real_ixi/*.html
+docs/research/evidence/real_ixi_containment/*.html
 wandb/
 lightning_logs/
 tensorboard/

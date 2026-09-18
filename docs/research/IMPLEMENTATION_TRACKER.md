@@ -243,6 +243,10 @@ the selected training representation; the other two are retained for controlled
 comparison. Each volume has an atomic, configuration-fingerprinted completion
 marker.
 
+The Jean Zay launcher uses one CPU and partition-default memory per volume,
+a 20-minute walltime, and an array concurrency cap of 12. Explicit `--mem` is
+not valid on Jean Zay and is intentionally omitted.
+
 ## Change log
 
 - 2026-09-18: Created the tracker and organized the research documents under

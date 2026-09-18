@@ -8,7 +8,6 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=8G
 #SBATCH --time=00:20:00
 #SBATCH --hint=nomultithread
 #SBATCH --output=%x-%A_%a.out

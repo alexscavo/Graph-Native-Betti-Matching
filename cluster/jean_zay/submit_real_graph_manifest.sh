@@ -39,7 +39,7 @@ echo "data       : $DATA_ROOT"
 echo "manifest   : $MANIFEST ($row_count volumes)"
 echo "output     : $OUTPUT"
 echo "array      : $ARRAY (one volume per shard)"
-echo "resources  : 1 CPU, 8G, 00:20:00; concurrency capped by array suffix"
+echo "resources  : 1 CPU, partition-default memory, 00:20:00; concurrency capped by array suffix"
 echo "extra args : ${REAL_GRAPH_ARGS:-<none>}"
 
 if [ "${REAL_GRAPH_DRY_RUN:-0}" = "1" ]; then

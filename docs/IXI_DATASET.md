@@ -498,7 +498,9 @@ $SCRATCH/datasets/IXI_sources/
 ```
 
 The three graph directories are separate comparison products generated with the
-same topology settings. They differ only in degree-2 geometry sampling. The
+same topology settings. `junction_only` retains anchors, `adaptive` uses the
+smoothed centerline plus RDP-selected degree-2 nodes, and `dense` preserves every
+raw centerline sample after topology cleanup but before smoothing or RDP. The
 patch generator automatically selects `graphs/adaptive/` as the compact training
 target; the other representations are evaluation controls until the
 representation study justifies a final choice.

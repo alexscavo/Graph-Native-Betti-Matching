@@ -53,7 +53,7 @@ PREFERRED_SEGMENTATIONS = {
     "IXI661-HH-2788": "IXI661-HH-2788-MRA.nii(1).gz",
 }
 REPRESENTATION_NAMES = ("junction_only", "adaptive", "dense")
-REPRESENTATION_SCHEMA_VERSION = 2
+REPRESENTATION_SCHEMA_VERSION = 3
 
 
 def complete_subjects(root: Path) -> list[str]:
@@ -184,6 +184,11 @@ def process_subject(subject: str, numeric: int, args: argparse.Namespace) -> dic
             else "canonical"
         ),
         "representation_schema_version": REPRESENTATION_SCHEMA_VERSION,
+        "representation_policy": {
+            "junction_only": "topological anchors; no optional degree-2 nodes",
+            "adaptive": "smoothed centerline; RDP-selected degree-2 nodes",
+            "dense": "raw centerline after topology cleanup; before smoothing and RDP",
+        },
         "representations": {
             name: {
                 "nodes": representation.node_count,

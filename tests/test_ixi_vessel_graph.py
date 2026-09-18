@@ -97,3 +97,19 @@ def test_source_discovery_defaults_to_adaptive_representation(tmp_path):
     sources = discover_sources(tmp_path)
 
     assert sources["7"][2] == tmp_path / "graphs/adaptive/7"
+
+
+def test_dense_reference_precedes_smoothing_and_simplification():
+    graphs = build_representation_family(
+        _square_ring_mask(),
+        spacing=(0.5, 0.5, 0.8),
+        adaptive_tolerance_mm=0.8,
+        spur_length=0,
+        smooth_iterations=5,
+        smooth_alpha=0.5,
+    )
+
+    dense_points = np.concatenate(graphs["dense"].centerlines)
+    adaptive_points = np.concatenate(graphs["adaptive"].centerlines)
+    assert np.allclose(dense_points, np.rint(dense_points))
+    assert np.any(np.abs(adaptive_points - np.rint(adaptive_points)) > 1e-6)

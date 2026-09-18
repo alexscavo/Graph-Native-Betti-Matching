@@ -648,7 +648,8 @@ def build_representation_family(
 
     - ``junction_only`` retains no degree-2 geometry nodes;
     - ``adaptive`` retains the minimum RDP-selected geometry nodes;
-    - ``dense`` retains every sample on the smoothed dense centerline.
+    - ``dense`` retains every sample on the raw post-topology-cleanup centerline,
+      before smoothing or RDP simplification.
 
     Keeping this family in one API prevents comparison scripts from accidentally
     changing topology parameters between variants.
@@ -656,6 +657,8 @@ def build_representation_family(
 
     common = dict(shared_options)
     common["spacing"] = spacing
+    dense_options = dict(common)
+    dense_options["smooth_iterations"] = 0
     return {
         "junction_only": build_vessel_graph(
             segmentation,
@@ -676,7 +679,7 @@ def build_representation_family(
             intermediate_nodes=True,
             rdp_tolerance_mm=0.0,
             radius_fraction=0.0,
-            **common,
+            **dense_options,
         ),
     }
 

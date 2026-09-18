@@ -10,12 +10,12 @@ Status vocabulary: `not started`, `in progress`, `blocked`, `complete`.
 
 A task is not complete until it has automated checks and inspectable evidence.
 For spatial or quantitative work, save both machine-readable data and a plot or
-screenshot under `artifacts/<task-id>/` so results can be independently reviewed.
+screenshot under `evidence/<task-id>/` so results can be independently reviewed.
 
 ## Current position
 
-- Current phase: Phase 1 — finalize the adaptive ground-truth representation.
-- Next task: preserve and name the immutable dense reference before simplification.
+- Current phase: Phase 2 — implement representation-quality metrics.
+- Next task: implement representation geometry, morphology, and complexity metrics.
 - Training changes: prohibited until the representation study is complete.
 
 ## Ordered task list
@@ -25,7 +25,7 @@ screenshot under `artifacts/<task-id>/` so results can be independently reviewed
 | T01 | Preserve pure degree-2 rings and add topology regression tests | 1 | complete |
 | T02 | Enforce the IXI638/IXI661 annotation overrides and record provenance | 1 | complete |
 | T03 | Emit junction-only, adaptive, and dense comparison representations | 1 | complete |
-| T04 | Preserve and name an immutable dense reference before simplification | 1 | not started |
+| T04 | Preserve and name an immutable dense reference before simplification | 1 | complete |
 | T05 | Implement representation geometry, morphology, and complexity metrics | 2 | not started |
 | T06 | Run the rate-distortion study across sites and acquisition resolutions | 2 | not started |
 | T07 | Implement degree-2 contraction, physical anchor matching, and Branch F1 | 3 | not started |
@@ -66,6 +66,17 @@ screenshot under `artifacts/<task-id>/` so results can be independently reviewed
 - Consequence: the current fixed voxel-based RDP and spur defaults are baselines,
   not accepted final policies. T06 must explicitly test their transferability.
 
+### D04 — Dense means pre-smoothing reference
+
+- Date: 2026-09-18
+- Status: accepted for implementation
+- Decision: `dense` is the ordered centerline after topology cleanup but before
+  smoothing and RDP. It is one of the three representations, not a fourth
+  auxiliary graph.
+- Reason: smoothing is an intentional geometric transformation. Its distortion
+  must be visible in the representation study instead of being silently folded
+  into the reference.
+
 ## Evidence log
 
 ### E01 — Pre-fix ring failure
@@ -93,6 +104,14 @@ Voreen files for each of `junction_only`, `adaptive`, and `dense`. The example
 retained identical topology `(beta_0, beta_1) = (1, 0)` while using 2, 4, and 39
 nodes respectively. Data and visualization: [`evidence/T03/`](evidence/T03/).
 
+### E05 — Dense-reference immutability
+
+The regression check verifies that dense-reference samples remain on the raw
+voxel-centre centerline while adaptive path samples reflect smoothing. The
+example contains 144 concatenated dense samples, all integer-valued, versus 78
+adaptive path samples with sub-voxel coordinates. Data and visualization:
+[`evidence/T04/`](evidence/T04/).
+
 ## Change log
 
 - 2026-09-18: Created the tracker and organized the research documents under
@@ -105,3 +124,6 @@ nodes respectively. Data and visualization: [`evidence/T03/`](evidence/T03/).
 - 2026-09-18: Completed T03 by emitting three explicit representation products,
   retaining adaptive as the automatically selected patch-training target, and
   validating the layout end to end.
+- 2026-09-18: Completed T04 by defining `dense` as the immutable centerline
+  before smoothing and RDP, recording the policy in provenance, and bumping the
+  representation schema so old completion markers cannot skip regeneration.

@@ -28,6 +28,7 @@ distribution reproduces the reference vessel graphs, without them it does not.
 
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass, field
 import json
 import math
@@ -91,6 +92,16 @@ class VesselGraph:
         components = len({find(i) for i in range(self.node_count)}) if self.node_count else 0
         beta_1 = self.edge_count - self.node_count + components
         return int(components), int(beta_1)
+
+
+@dataclass(frozen=True)
+class DenseCenterline:
+    """Immutable, high-detail intermediate shared by every graph representation."""
+
+    graph: VesselGraph
+    segmentation: np.ndarray = field(repr=False)
+    spacing: np.ndarray
+    provenance: dict[str, object] = field(default_factory=dict)
 
 
 def _prune_local_redundancy(
@@ -303,6 +314,25 @@ def smooth_polyline(
         voxel = np.clip(np.rint(candidate).astype(np.int64), 0, extent)
         outside = ~mask[voxel[:, 0], voxel[:, 1], voxel[:, 2]]
         candidate[outside] = current[outside]
+        # A sample can remain inside while either adjacent straight segment cuts
+        # through background. Reject such moves as well. Repeat because reverting
+        # one sample changes the segment tested by its neighbour; the raw voxel
+        # path is the finite fallback and is valid under the same sampling rule.
+        changed = True
+        while changed:
+            changed = False
+            reject = []
+            for index in range(1, len(candidate) - 1):
+                if np.array_equal(candidate[index], current[index]):
+                    continue
+                if (
+                    chord_mask_fraction(candidate[index - 1], candidate[index], mask) < 1.0
+                    or chord_mask_fraction(candidate[index], candidate[index + 1], mask) < 1.0
+                ):
+                    reject.append(index)
+            if reject:
+                candidate[np.asarray(reject)] = current[np.asarray(reject)]
+                changed = True
         current = candidate
     return current
 
@@ -349,6 +379,87 @@ def rdp_keep_mask(polyline: np.ndarray, tolerance) -> np.ndarray:
             stack.append((start, split))
             stack.append((split, end))
     return keep
+
+
+def chord_mask_fraction(
+    start: np.ndarray,
+    end: np.ndarray,
+    mask: np.ndarray,
+    *,
+    samples_per_voxel: float = 4.0,
+) -> float:
+    """Return the fraction of a straight voxel-coordinate chord inside ``mask``."""
+
+    start = np.asarray(start, dtype=np.float64)
+    end = np.asarray(end, dtype=np.float64)
+    count = max(2, int(np.linalg.norm(end - start) * samples_per_voxel) + 1)
+    samples = start + np.linspace(0.0, 1.0, count)[:, None] * (end - start)
+    extent = np.asarray(mask.shape, dtype=np.int64) - 1
+    inside = np.zeros(count, dtype=bool)
+    # Voxels are closed cells. At an exact face/edge/corner boundary, accept the
+    # point when *any* incident cell is foreground. This avoids inventing an
+    # outside point for a valid diagonal transition between touching voxels.
+    epsilon = 1e-9
+    for dz in (-epsilon, epsilon):
+        for dy in (-epsilon, epsilon):
+            for dx in (-epsilon, epsilon):
+                indices = np.floor(samples + 0.5 + (dz, dy, dx)).astype(np.int64)
+                valid = np.logical_and(indices >= 0, indices <= extent).all(axis=1)
+                if valid.any():
+                    selected = indices[valid]
+                    inside[valid] |= mask[selected[:, 0], selected[:, 1], selected[:, 2]]
+    return float(inside.mean())
+
+
+def enforce_chord_containment(
+    polyline: np.ndarray,
+    keep: np.ndarray,
+    mask: np.ndarray,
+    *,
+    minimum_fraction: float = 1.0,
+) -> np.ndarray:
+    """Add dense samples until every retained straight chord stays in the lumen.
+
+    RDP bounds distance from a centreline but does not imply containment in a
+    narrow or non-convex vessel. This deterministic refinement never removes an
+    RDP point. For an invalid interval it inserts the interior dense sample with
+    greatest deviation from the chord (or the midpoint for a degenerate tie),
+    then rechecks the two smaller intervals. In the worst case every dense sample
+    is retained, providing a finite, auditable fallback rather than an invalid
+    training edge.
+    """
+
+    if not 0.0 <= minimum_fraction <= 1.0:
+        raise ValueError("minimum_fraction must lie in [0, 1]")
+    refined = np.asarray(keep, dtype=bool).copy()
+    refined[0] = refined[-1] = True
+    pending = [
+        (int(left), int(right))
+        for left, right in zip(np.flatnonzero(refined)[:-1], np.flatnonzero(refined)[1:])
+    ]
+    while pending:
+        start, end = pending.pop()
+        if end - start < 2:
+            continue
+        if chord_mask_fraction(polyline[start], polyline[end], mask) >= minimum_fraction:
+            continue
+        anchor, tip = polyline[start], polyline[end]
+        direction = tip - anchor
+        length = float(np.linalg.norm(direction))
+        interior = polyline[start + 1 : end]
+        if length < 1e-9:
+            distances = np.linalg.norm(interior - anchor, axis=1)
+        else:
+            distances = np.linalg.norm(
+                np.cross(interior - anchor, direction), axis=1
+            ) / length
+        split = start + 1 + int(np.argmax(distances))
+        if float(distances.max(initial=0.0)) <= 1e-12:
+            split = (start + end) // 2
+        refined[split] = True
+        pending.append((start, split))
+        pending.append((split, end))
+    return refined
 
 
 def _branch_polylines(
@@ -446,6 +557,8 @@ def build_vessel_graph(
     max_junction_extent_mm: float = 1.5,
     radius_fraction: float = 0.0,
     min_tolerance_mm: float = 0.1,
+    enforce_lumen_containment: bool = False,
+    minimum_chord_fraction: float = 1.0,
 ) -> VesselGraph:
     """Reduce a binary segmentation to a sparse vessel graph.
 
@@ -483,6 +596,7 @@ def build_vessel_graph(
     }
 
     positions: list[np.ndarray] = []
+    representative_voxels: list[int] = []
     anchor_of: dict[int, int] = {}
     for members in clusters:
         anchor = len(positions)
@@ -493,13 +607,16 @@ def build_vessel_graph(
         member_points = points[np.asarray(members)].astype(np.float64)
         centre = member_points.mean(axis=0)
         nearest = int(np.argmin(np.linalg.norm(member_points - centre, axis=1)))
+        representative = members[nearest]
         positions.append(member_points[nearest])
+        representative_voxels.append(representative)
         for voxel in members:
             anchor_of[voxel] = anchor
     for voxel, value in sorted(degree.items()):
         if value == 1:
             anchor_of[voxel] = len(positions)
             positions.append(points[voxel].astype(np.float64))
+            representative_voxels.append(voxel)
 
     branches, rings = _branch_polylines(adjacency, dead, anchor_of)
 
@@ -513,6 +630,7 @@ def build_vessel_graph(
         for index in split:
             ring_nodes.append(len(positions))
             positions.append(points[ring[index]].astype(np.float64))
+            representative_voxels.append(ring[index])
         for part in range(3):
             start = split[part]
             end = split[(part + 1) % 3]
@@ -537,6 +655,48 @@ def build_vessel_graph(
             for node_a, node_b, path in branches
             if node_a != node_b or len(path) > max_artifact_self_loop
         ]
+
+    def route_inside_anchor(start: int, target: int, anchor: int) -> list[int]:
+        """Shortest skeleton route inside one collapsed junction cluster."""
+
+        if start == target:
+            return [start]
+        previous: dict[int, int | None] = {start: None}
+        queue = deque([start])
+        found = False
+        while queue and not found:
+            current = queue.popleft()
+            for neighbour in adjacency[current]:
+                if neighbour in previous or anchor_of.get(neighbour) != anchor:
+                    continue
+                previous[neighbour] = current
+                queue.append(neighbour)
+                if neighbour == target:
+                    found = True
+                    break
+        if target not in previous:
+            return [start, target]
+        route = [target]
+        while route[-1] != start:
+            parent = previous[route[-1]]
+            if parent is None:  # only possible for the start node
+                break
+            route.append(parent)
+        return list(reversed(route))
+
+    # Preserve the real skeleton route through each collapsed junction. Without
+    # this prefix/suffix, replacing a branch endpoint by the shared representative
+    # node creates a direct shortcut that can leave a non-convex junction lumen.
+    routed_branches = []
+    for node_a, node_b, path in branches:
+        representative_a = representative_voxels[node_a]
+        representative_b = representative_voxels[node_b]
+        prefix = route_inside_anchor(representative_a, path[0], node_a)
+        suffix = route_inside_anchor(path[-1], representative_b, node_b)
+        routed_branches.append(
+            (node_a, node_b, prefix[:-1] + path + suffix[1:])
+        )
+    branches = routed_branches
 
     tolerance_voxels = (
         float(rdp_tolerance_mm / max(float(spacing_array.min()), 1e-9))
@@ -577,6 +737,13 @@ def build_vessel_graph(
             keep = rdp_keep_mask(polyline * spacing_array, limit)
         else:
             keep = rdp_keep_mask(polyline * spacing_array, rdp_tolerance_mm)
+        if enforce_lumen_containment:
+            keep = enforce_chord_containment(
+                polyline,
+                keep,
+                mask,
+                minimum_fraction=minimum_chord_fraction,
+            )
         split_indices = [i for i in range(1, len(polyline) - 1) if keep[i]]
         previous_index, previous_node = 0, node_a
         for index in split_indices:
@@ -633,12 +800,198 @@ def build_vessel_graph(
     )
 
 
+def extract_dense_centerline(
+    segmentation: np.ndarray,
+    *,
+    spacing: Sequence[float] = (1.0, 1.0, 1.0),
+    **topology_options,
+) -> DenseCenterline:
+    """Extract topology once and retain every post-cleanup centerline sample."""
+
+    options = dict(topology_options)
+    options.pop("smooth_iterations", None)
+    options.pop("smooth_alpha", None)
+    graph = build_vessel_graph(
+        segmentation,
+        spacing=spacing,
+        intermediate_nodes=True,
+        rdp_tolerance_mm=0.0,
+        radius_fraction=0.0,
+        smooth_iterations=0,
+        **options,
+    )
+    mask = np.asarray(segmentation, dtype=bool).copy()
+    mask.setflags(write=False)
+    spacing_array = np.asarray(spacing, dtype=np.float64).copy()
+    spacing_array.setflags(write=False)
+    return DenseCenterline(
+        graph=graph,
+        segmentation=mask,
+        spacing=spacing_array,
+        provenance={
+            "backend": "skimage_skeletonize_3d",
+            "skeleton_voxels": graph.skeleton_voxels,
+            "pruned_voxels": graph.pruned_voxels,
+            "topology_options": options,
+        },
+    )
+
+
+def _dense_branch_paths(graph: VesselGraph) -> list[list[int]]:
+    """Return maximal degree-2 chains, including deterministic pure cycles."""
+
+    adjacency: list[list[int]] = [[] for _ in range(graph.node_count)]
+    for left, right in graph.edges:
+        adjacency[left].append(right)
+        adjacency[right].append(left)
+    anchors = {index for index, neighbours in enumerate(adjacency) if len(neighbours) != 2}
+    visited: set[tuple[int, int]] = set()
+    paths: list[list[int]] = []
+
+    def mark(left: int, right: int) -> None:
+        visited.add((min(left, right), max(left, right)))
+
+    for start in sorted(anchors):
+        for first in sorted(adjacency[start]):
+            key = (min(start, first), max(start, first))
+            if key in visited:
+                continue
+            mark(start, first)
+            path = [start, first]
+            previous, current = start, first
+            while current not in anchors:
+                following = next(item for item in adjacency[current] if item != previous)
+                mark(current, following)
+                path.append(following)
+                previous, current = current, following
+            paths.append(path)
+
+    # Any unvisited edge belongs to a component made entirely of degree-2 nodes.
+    for seed, neighbours in enumerate(adjacency):
+        if not neighbours:
+            continue
+        first = neighbours[0]
+        if (min(seed, first), max(seed, first)) in visited:
+            continue
+        cycle = [seed]
+        previous, current = seed, first
+        mark(seed, first)
+        while current != seed:
+            cycle.append(current)
+            following = next(item for item in adjacency[current] if item != previous)
+            mark(current, following)
+            previous, current = current, following
+        split = sorted({0, len(cycle) // 3, (2 * len(cycle)) // 3})
+        for part, begin in enumerate(split):
+            end = split[(part + 1) % len(split)]
+            if part + 1 < len(split):
+                paths.append(cycle[begin : end + 1])
+            else:
+                paths.append(cycle[begin:] + [cycle[0]])
+    return paths
+
+
+def derive_graph_from_dense(
+    dense: DenseCenterline,
+    representation: str,
+    *,
+    adaptive_tolerance_mm: float = 0.0,
+    adaptive_radius_fraction: float = 0.0,
+    min_tolerance_mm: float = 0.1,
+    smooth_iterations: int = 5,
+    smooth_alpha: float = 0.5,
+    enforce_lumen_containment: bool = True,
+    minimum_chord_fraction: float = 1.0,
+) -> VesselGraph:
+    """Derive one compact representation without repeating skeletonization."""
+
+    if representation == "dense":
+        return dense.graph
+    if representation not in {"junction_only", "adaptive"}:
+        raise ValueError(f"unknown representation: {representation}")
+    from scipy.ndimage import distance_transform_edt
+
+    source = dense.graph
+    paths = _dense_branch_paths(source)
+    anchors = sorted({path[0] for path in paths} | {path[-1] for path in paths})
+    output_index = {source_index: index for index, source_index in enumerate(anchors)}
+    positions = [source.node_positions[index].copy() for index in anchors]
+    radii = [float(source.node_radii[index]) for index in anchors]
+    edges: list[tuple[int, int]] = []
+    centerlines: list[np.ndarray] = []
+    radius_map = distance_transform_edt(dense.segmentation, sampling=dense.spacing)
+
+    for path in paths:
+        polyline = source.node_positions[np.asarray(path)].astype(np.float64, copy=True)
+        polyline = smooth_polyline(
+            polyline,
+            dense.segmentation,
+            iterations=smooth_iterations,
+            alpha=smooth_alpha,
+        )
+        keep = np.zeros(len(polyline), dtype=bool)
+        keep[0] = keep[-1] = True
+        if representation == "adaptive" and len(polyline) > 2:
+            if adaptive_radius_fraction > 0:
+                voxel = np.clip(
+                    np.floor(polyline + 0.5).astype(np.int64),
+                    0,
+                    np.asarray(dense.segmentation.shape) - 1,
+                )
+                local = radius_map[voxel[:, 0], voxel[:, 1], voxel[:, 2]]
+                limit = np.maximum(adaptive_radius_fraction * local, min_tolerance_mm)
+                if adaptive_tolerance_mm > 0:
+                    limit = np.minimum(limit, adaptive_tolerance_mm)
+            else:
+                limit = adaptive_tolerance_mm
+            keep = rdp_keep_mask(polyline * dense.spacing, limit)
+            if enforce_lumen_containment:
+                keep = enforce_chord_containment(
+                    polyline, keep, dense.segmentation,
+                    minimum_fraction=minimum_chord_fraction,
+                )
+        retained = np.flatnonzero(keep)
+        previous_node = output_index[path[0]]
+        previous_sample = 0
+        for sample_index in retained[1:-1]:
+            node = len(positions)
+            positions.append(polyline[sample_index].copy())
+            voxel = np.clip(
+                np.floor(polyline[sample_index] + 0.5).astype(np.int64),
+                0, np.asarray(dense.segmentation.shape) - 1,
+            )
+            radii.append(float(radius_map[tuple(voxel)]))
+            edges.append((previous_node, node))
+            centerlines.append(polyline[previous_sample : sample_index + 1])
+            previous_node, previous_sample = node, int(sample_index)
+        edges.append((previous_node, output_index[path[-1]]))
+        centerlines.append(polyline[previous_sample:])
+
+    node_positions = np.asarray(positions, dtype=np.float64).reshape(-1, 3)
+    degrees = np.zeros(len(node_positions), dtype=np.int64)
+    for left, right in edges:
+        degrees[left] += 1
+        degrees[right] += 1
+    return VesselGraph(
+        node_positions=node_positions,
+        node_degrees=degrees,
+        edges=edges,
+        centerlines=centerlines,
+        node_radii=np.asarray(radii, dtype=np.float64),
+        skeleton_voxels=source.skeleton_voxels,
+        pruned_voxels=source.pruned_voxels,
+        ring_count=source.ring_count,
+    )
+
+
 def build_representation_family(
     segmentation: np.ndarray,
     *,
     spacing: Sequence[float] = (1.0, 1.0, 1.0),
     adaptive_tolerance_mm: float,
     adaptive_radius_fraction: float = 0.0,
+    enforce_lumen_containment: bool = True,
+    minimum_chord_fraction: float = 1.0,
     **shared_options,
 ) -> dict[str, VesselGraph]:
     """Build the three Phase-1 comparison representations.
@@ -656,31 +1009,27 @@ def build_representation_family(
     """
 
     common = dict(shared_options)
-    common["spacing"] = spacing
-    dense_options = dict(common)
-    dense_options["smooth_iterations"] = 0
+    smooth_iterations = int(common.pop("smooth_iterations", 5))
+    smooth_alpha = float(common.pop("smooth_alpha", 0.5))
+    min_tolerance_mm = float(common.pop("min_tolerance_mm", 0.1))
+    dense = extract_dense_centerline(segmentation, spacing=spacing, **common)
+    derivation = dict(
+        smooth_iterations=smooth_iterations,
+        smooth_alpha=smooth_alpha,
+        enforce_lumen_containment=enforce_lumen_containment,
+        minimum_chord_fraction=minimum_chord_fraction,
+    )
     return {
-        "junction_only": build_vessel_graph(
-            segmentation,
-            intermediate_nodes=False,
-            rdp_tolerance_mm=0.0,
-            radius_fraction=0.0,
-            **common,
+        "junction_only": derive_graph_from_dense(dense, "junction_only", **derivation),
+        "adaptive": derive_graph_from_dense(
+            dense,
+            "adaptive",
+            adaptive_tolerance_mm=adaptive_tolerance_mm,
+            adaptive_radius_fraction=adaptive_radius_fraction,
+            min_tolerance_mm=min_tolerance_mm,
+            **derivation,
         ),
-        "adaptive": build_vessel_graph(
-            segmentation,
-            intermediate_nodes=True,
-            rdp_tolerance_mm=adaptive_tolerance_mm,
-            radius_fraction=adaptive_radius_fraction,
-            **common,
-        ),
-        "dense": build_vessel_graph(
-            segmentation,
-            intermediate_nodes=True,
-            rdp_tolerance_mm=0.0,
-            radius_fraction=0.0,
-            **dense_options,
-        ),
+        "dense": dense.graph,
     }
 
 

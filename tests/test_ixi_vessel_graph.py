@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+from unittest.mock import patch
 
 from scripts.audit_synthetic_mri_grid import discover_sources
 from scripts.ixi_vessel_graph import build_representation_family, build_vessel_graph
@@ -100,8 +101,12 @@ def test_source_discovery_defaults_to_adaptive_representation(tmp_path):
 
 
 def test_dense_reference_precedes_smoothing_and_simplification():
+    from scipy.ndimage import binary_dilation
+
+    # Give the sub-voxel curve room to move while remaining inside the lumen.
+    mask = binary_dilation(_square_ring_mask(), iterations=2)
     graphs = build_representation_family(
-        _square_ring_mask(),
+        mask,
         spacing=(0.5, 0.5, 0.8),
         adaptive_tolerance_mm=0.8,
         spur_length=0,
@@ -113,3 +118,31 @@ def test_dense_reference_precedes_smoothing_and_simplification():
     adaptive_points = np.concatenate(graphs["adaptive"].centerlines)
     assert np.allclose(dense_points, np.rint(dense_points))
     assert np.any(np.abs(adaptive_points - np.rint(adaptive_points)) > 1e-6)
+
+
+def test_smoothing_safely_falls_back_in_a_one_voxel_lumen():
+    graphs = build_representation_family(
+        _square_ring_mask(),
+        spacing=(0.5, 0.5, 0.8),
+        adaptive_tolerance_mm=0.8,
+        spur_length=0,
+        smooth_iterations=5,
+        smooth_alpha=0.5,
+    )
+
+    adaptive_points = np.concatenate(graphs["adaptive"].centerlines)
+    assert np.allclose(adaptive_points, np.rint(adaptive_points))
+
+
+def test_representation_family_skeletonizes_only_once():
+    from skimage.morphology import skeletonize as real_skeletonize
+
+    with patch("skimage.morphology.skeletonize", wraps=real_skeletonize) as mocked:
+        build_representation_family(
+            _square_ring_mask(),
+            spacing=(0.5, 0.5, 0.8),
+            adaptive_tolerance_mm=0.8,
+            spur_length=0,
+        )
+
+    assert mocked.call_count == 1

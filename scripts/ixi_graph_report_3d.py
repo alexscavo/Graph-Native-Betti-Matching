@@ -26,7 +26,10 @@ import nibabel as nib
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scripts.ixi_vessel_graph import build_representation_family  # noqa: E402
+from scripts.ixi_vessel_graph import (  # noqa: E402
+    build_representation_family,
+    chord_mask_fraction,
+)
 from scripts.prepare_ixi_sources import segmentation_path  # noqa: E402
 
 
@@ -273,6 +276,10 @@ def build_report(args: argparse.Namespace) -> Path:
     graph_summary = {}
     for name, graph in graphs.items():
         beta_0, beta_1 = graph.betti()
+        containment = np.asarray(
+            [chord_mask_fraction(line[0], line[-1], cropped) for line in graph.centerlines],
+            dtype=np.float64,
+        )
         graph_summary[name] = {
             "nodes": graph.node_count,
             "edges": graph.edge_count,
@@ -280,6 +287,9 @@ def build_report(args: argparse.Namespace) -> Path:
             "beta_0": beta_0,
             "beta_1": beta_1,
             "loop_edges": len(loop_edges(graph)[0]),
+            "minimum_edge_chord_containment": float(containment.min()) if len(containment) else 1.0,
+            "mean_edge_chord_containment": float(containment.mean()) if len(containment) else 1.0,
+            "off_lumen_edge_chords": int(np.count_nonzero(containment < 1.0)),
         }
     rows = [
         ("subject", args.subject),
@@ -353,6 +363,25 @@ its id, degree and local vessel radius.</p>
     destination.with_suffix(".summary.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True) + "\n"
     )
+    # A compact static decision aid accompanies the interactive 3-D report.
+    import matplotlib.pyplot as plt
+    names = ["junction_only", "adaptive", "dense"]
+    fig, axes = plt.subplots(1, 3, figsize=(12, 3.8), constrained_layout=True)
+    for axis, key, title in (
+        (axes[0], "nodes", "Nodes"),
+        (axes[1], "edges", "Edges"),
+        (axes[2], "minimum_edge_chord_containment", "Worst chord containment"),
+    ):
+        values = [graph_summary[name][key] for name in names]
+        bars = axis.bar([name.replace("_", "\n") for name in names], values,
+                        color=("#8e44ad", "#c0392b", "#008c95"))
+        axis.set_title(title)
+        axis.bar_label(bars, fmt="%.3g", padding=2)
+        if key.endswith("containment"):
+            axis.set_ylim(0, 1.08)
+    fig.suptitle(f"{args.subject}: three representations from one dense centerline")
+    fig.savefig(destination.with_suffix(".png"), dpi=180)
+    plt.close(fig)
     return destination
 
 

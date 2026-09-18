@@ -155,6 +155,31 @@ and/or a budget-aware representation policy. CPU Slurm array job `2141634` is
 pending for the three-representation, three-subject audit. Evidence:
 [`evidence/real_ixi_patch_budget/`](evidence/real_ixi_patch_budget/).
 
+## Dense intermediate and lumen-safe compact geometry (2026-09-18)
+
+The extractor now skeletonizes each segmentation once into an immutable dense
+centerline intermediate and deterministically derives junction-only, adaptive,
+and dense graphs from it. Junction representatives retain their real skeleton
+routes through non-convex clusters; smoothing rejects moves whose adjacent
+segments leave the mask; adaptive RDP subdivision then adds samples until every
+straight training edge remains inside the segmented lumen.
+
+On the real IXI002 densest crop, all representations retain β₀/β₁ = 5/37. The
+adaptive graph has 244 nodes / 276 edges versus 983 / 1015 dense, with minimum
+edge-chord lumen containment 1.0. Junction-only has 98 / 130 but minimum
+containment 0.106, so it remains a topology-preserving ablation rather than the
+recommended geometric target. See
+[`evidence/real_ixi_containment/`](evidence/real_ixi_containment/).
+
+The reusable evaluator `scripts/compare_dense_centerlines.py` emits CSV, JSON,
+PNG and interactive HTML, and `metrics/representation_geometry.py` supplies
+continuous-polyline distance, curve precision/recall/F1, ACD, HD95, length,
+tortuosity and normalized graph-complexity metrics.
+
+The oversized Slurm audit job 2141634 was cancelled before execution. The audit
+request is now one CPU and 30 minutes; no replacement job has been submitted
+while local real-crop validation is sufficient.
+
 ## Change log
 
 - 2026-09-18: Created the tracker and organized the research documents under

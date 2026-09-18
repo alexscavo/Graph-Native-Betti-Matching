@@ -1,0 +1,93 @@
+{
+  "boundary": {
+    "boundary_recall": 1.0,
+    "exact_boundary_contacts": 13,
+    "inherited_terminal_candidates": 18,
+    "matched_boundary_contacts": 13,
+    "max_correspondence_distance": 0.8660254037844141,
+    "max_inherited_terminal_face_gap": 9.499999366422458,
+    "max_matched_inherited_face_gap": 0.5556640625,
+    "mean_correspondence_distance": 0.562619590294045,
+    "mean_inherited_terminal_face_gap": 0.9982638502958768,
+    "mean_matched_inherited_face_gap": 0.420673076923066,
+    "missing_boundary_contacts": 0
+  },
+  "bounds": [
+    [
+      119.5,
+      183.5
+    ],
+    [
+      191.5,
+      255.5
+    ],
+    [
+      -0.5,
+      63.5
+    ]
+  ],
+  "coordinate_system": "voxel",
+  "exact_topology": {
+    "components": 2,
+    "cycle_rank": 7,
+    "degree_2_nodes": 61,
+    "edges": 108,
+    "isolated_nodes": 0,
+    "junction_nodes": 24,
+    "nodes": 103,
+    "terminal_nodes": 18
+  },
+  "geometry": {
+    "average_centerline_distance": 0.00660647825244173,
+    "curve_f1": 1.0,
+    "curve_precision": 1.0,
+    "curve_recall": 1.0,
+    "hd95": 0.040261767789079445
+  },
+  "geometry_image": "/lustre/fsn1/projects/rech/vnc/upz25mj/datasets/IXI/labelsTr/IXI122-Guys-0773-MRA_IXI-Guys.nii.gz",
+  "geometry_physical_mm": {
+    "average_centerline_distance": 0.0034264137924253555,
+    "curve_f1": 1.0,
+    "curve_precision": 1.0,
+    "curve_recall": 1.0,
+    "curve_tolerance_mm": 1.0,
+    "hd95": 0.023287759358628438,
+    "sample_spacing_mm": 0.2343749701976776
+  },
+  "graph_dir": "/lustre/fswork/projects/rech/vnc/upz25mj/projects/Graph-Native-Betti-Matching/docs/research/artifacts/full_volume_graphs/adaptive/IXI122-new-full",
+  "inherited_topology": {
+    "components": 2,
+    "cycle_rank": 7,
+    "degree_2_nodes": 61,
+    "edges": 108,
+    "isolated_nodes": 0,
+    "junction_nodes": 24,
+    "nodes": 103,
+    "terminal_nodes": 18
+  },
+  "settings": {
+    "boundary_tolerance": 1e-06,
+    "correspondence_tolerance": 3.0,
+    "curve_tolerance": 1.0,
+    "hard_token_budget": 120,
+    "preferred_edge_budget": 70,
+    "sample_spacing": 0.5
+  },
+  "tokens": {
+    "exact_edges": 108,
+    "exact_exceeds_hard_node_tokens": false,
+    "exact_exceeds_preferred_edges": true,
+    "exact_nodes": 103,
+    "inherited_edges": 108,
+    "inherited_exceeds_hard_node_tokens": false,
+    "inherited_exceeds_preferred_edges": true,
+    "inherited_nodes": 103
+  },
+  "topology_delta_inherited_minus_exact": {
+    "components": 0,
+    "cycle_rank": 0,
+    "edges": 0,
+    "isolated_nodes": 0,
+    "nodes": 0
+  }
+}

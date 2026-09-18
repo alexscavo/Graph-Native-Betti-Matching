@@ -136,10 +136,38 @@ class CroppedGraph:
     positions: np.ndarray
     edges: np.ndarray
     tangent_contact_count: int = 0
+    # True only for nodes introduced by exact polyline/box clipping.  Original
+    # anatomical nodes which happen to lie on a patch face remain False: callers
+    # can therefore distinguish a truncation endpoint from a real graph node.
+    boundary_intersections: np.ndarray | None = None
+    # Source edge index for each synthetic boundary intersection, -1 otherwise.
+    # Together with the world position this provides a deterministic identity in
+    # adjacent patches without changing the model's node/edge tensors.
+    boundary_source_edges: np.ndarray | None = None
 
     @property
     def edge_count(self) -> int:
         return int(len(self.edges))
+
+    def boundary_correspondence_keys(
+        self, decimals: int = 7
+    ) -> tuple[tuple[int, float, float, float] | None, ...]:
+        """Return stable cross-patch identities for synthetic boundary nodes."""
+
+        if self.boundary_intersections is None or self.boundary_source_edges is None:
+            return tuple(None for _ in self.positions)
+        rounded = np.round(np.asarray(self.positions, dtype=np.float64), decimals)
+        return tuple(
+            (
+                int(self.boundary_source_edges[index]),
+                float(position[0]),
+                float(position[1]),
+                float(position[2]),
+            )
+            if bool(self.boundary_intersections[index])
+            else None
+            for index, position in enumerate(rounded)
+        )
 
 
 class SourceGraph:
@@ -170,6 +198,30 @@ class SourceGraph:
             [polyline.max(axis=0) for polyline in self.edge_polylines],
             dtype=np.float64,
         ).reshape(-1, 3)
+
+    def transformed(self, affine: np.ndarray) -> "SourceGraph":
+        """Return the same graph expressed in another affine coordinate frame."""
+
+        matrix = np.asarray(affine, dtype=np.float64)
+        if matrix.shape != (4, 4):
+            raise ValueError(f"Expected a 4x4 affine, received {matrix.shape}")
+
+        def apply(points: Sequence[np.ndarray]) -> tuple[np.ndarray, ...]:
+            array = np.asarray(points, dtype=np.float64).reshape(-1, 3)
+            if not len(array):
+                return ()
+            homogeneous = np.concatenate((array, np.ones((len(array), 1))), axis=1)
+            return tuple((homogeneous @ matrix.T)[:, :3])
+
+        nodes = {
+            node_id: apply((position,))[0]
+            for node_id, position in self.nodes.items()
+        }
+        centerlines = [
+            CenterlineEdge(edge.node1, edge.node2, apply(edge.positions))
+            for edge in self.centerlines
+        ]
+        return SourceGraph(nodes, self.edges, centerlines)
 
     @classmethod
     def from_directory(cls, directory: Path) -> "SourceGraph":
@@ -452,15 +504,19 @@ class SourceGraph:
             ).all(axis=1)
             inside_ids = self.node_ids[inside_mask].tolist()
             positions = [position.copy() for position in self.node_positions[inside_mask]]
+            boundary_intersections = [False] * len(positions)
+            boundary_source_edges = [-1] * len(positions)
             kept_indices = {
                 int(node_id): index for index, node_id in enumerate(inside_ids)
             }
         else:
             positions = []
+            boundary_intersections = []
+            boundary_source_edges = []
             kept_indices = {}
 
         def component_endpoint_index(
-            point: np.ndarray, source_edge: CenterlineEdge
+            point: np.ndarray, source_edge: CenterlineEdge, source_edge_index: int
         ) -> int:
             for node_id in (source_edge.node1, source_edge.node2):
                 if node_id in kept_indices and np.allclose(
@@ -469,6 +525,8 @@ class SourceGraph:
                     return kept_indices[node_id]
             index = len(positions)
             positions.append(point.copy())
+            boundary_intersections.append(True)
+            boundary_source_edges.append(source_edge_index)
             return index
 
         edges = []
@@ -478,11 +536,17 @@ class SourceGraph:
             polyline = self.edge_polylines[int(edge_index)]
             for component in self._clip_polyline(polyline, bounds):
                 if len(component) == 1:
-                    component_endpoint_index(component[0], source_edge)
+                    component_endpoint_index(
+                        component[0], source_edge, int(edge_index)
+                    )
                     tangent_contact_count += 1
                     continue
-                left = component_endpoint_index(component[0], source_edge)
-                right = component_endpoint_index(component[-1], source_edge)
+                left = component_endpoint_index(
+                    component[0], source_edge, int(edge_index)
+                )
+                right = component_endpoint_index(
+                    component[-1], source_edge, int(edge_index)
+                )
                 if left != right:
                     edges.append((left, right))
 
@@ -492,6 +556,8 @@ class SourceGraph:
             positions=array,
             edges=edge_array,
             tangent_contact_count=tangent_contact_count,
+            boundary_intersections=np.asarray(boundary_intersections, dtype=bool),
+            boundary_source_edges=np.asarray(boundary_source_edges, dtype=np.int64),
         )
 
 
@@ -577,6 +643,16 @@ def patch_world_bounds(
     end_array = start_array + np.asarray(crop_size, dtype=np.float64) - 1.0
     corners = voxel_to_world(np.stack((start_array, end_array)), affine)
     return np.sort(corners.T, axis=1)
+
+
+def patch_voxel_cell_bounds(
+    start: Sequence[int], crop_size: Sequence[int]
+) -> np.ndarray:
+    """Bounds of the complete voxel cells belonging to a cropped image array."""
+
+    lower = np.asarray(start, dtype=np.float64) - 0.5
+    upper = np.asarray(start, dtype=np.float64) + np.asarray(crop_size) - 0.5
+    return np.stack((lower, upper), axis=1)
 
 
 def coordinate_range(

@@ -14,10 +14,39 @@ from scripts.audit_synthetic_mri_grid import (
     complete_grid_positions,
     inherited_rejection_reason,
     main,
+    patch_voxel_cell_bounds,
 )
 
 
 class GridAuditTests(unittest.TestCase):
+    def test_patch_voxel_cell_bounds_use_shared_cell_faces(self):
+        first = patch_voxel_cell_bounds((0, 4, 8), (10, 10, 10))
+        second = patch_voxel_cell_bounds((10, 4, 8), (10, 10, 10))
+
+        np.testing.assert_allclose(first[:, 0], (-0.5, 3.5, 7.5))
+        np.testing.assert_allclose(first[:, 1], (9.5, 13.5, 17.5))
+        self.assertEqual(first[0, 1], second[0, 0])
+
+    def test_graph_can_be_transformed_to_voxel_frame_before_crop(self):
+        voxel_to_world = np.asarray(
+            ((0.0, -2.0, 0.0, 30.0), (1.0, 0.0, 0.0, -4.0),
+             (0.0, 0.0, 3.0, 7.0), (0.0, 0.0, 0.0, 1.0))
+        )
+        voxel_points = np.asarray(((2.0, 3.0, 4.0), (12.0, 3.0, 4.0)))
+        homogeneous = np.concatenate((voxel_points, np.ones((2, 1))), axis=1)
+        world_points = (homogeneous @ voxel_to_world.T)[:, :3]
+        graph = SourceGraph(
+            nodes={1: world_points[0], 2: world_points[1]},
+            edges=[(1, 2)],
+            centerlines=[CenterlineEdge(1, 2, ())],
+        )
+
+        cropped = graph.transformed(np.linalg.inv(voxel_to_world)).crop(
+            patch_voxel_cell_bounds((0, 0, 0), (10, 10, 10))
+        )
+
+        np.testing.assert_allclose(cropped.positions[0], voxel_points[0])
+        np.testing.assert_allclose(cropped.positions[1], (9.5, 3.0, 4.0))
     def test_complete_axis_starts_include_both_boundaries(self):
         self.assertEqual(complete_axis_starts(325, 54, 40), [0, 40, 80, 120, 160, 200, 240, 271])
         self.assertEqual(complete_axis_starts(304, 54, 40), [0, 40, 80, 120, 160, 200, 240, 250])
@@ -74,6 +103,44 @@ class GridAuditTests(unittest.TestCase):
         self.assertEqual(cropped.edge_count, 1)
         np.testing.assert_array_equal(cropped.positions[-1], np.asarray((10.0, 2.0, 2.0)))
         np.testing.assert_array_equal(cropped.edges, np.asarray(((0, 1),)))
+        np.testing.assert_array_equal(cropped.boundary_intersections, (False, True))
+        np.testing.assert_array_equal(cropped.boundary_source_edges, (-1, 0))
+        self.assertEqual(
+            cropped.boundary_correspondence_keys(),
+            (None, (0, 10.0, 2.0, 2.0)),
+        )
+
+    def test_adjacent_patch_intersections_have_the_same_correspondence_key(self):
+        graph = SourceGraph(
+            nodes={
+                1: np.asarray((2.0, 2.0, 2.0)),
+                2: np.asarray((18.0, 2.0, 2.0)),
+            },
+            edges=[(1, 2)],
+            centerlines=[CenterlineEdge(1, 2, ())],
+        )
+
+        left = graph.crop(np.asarray(((0.0, 10.0), (0.0, 10.0), (0.0, 10.0))))
+        right = graph.crop(np.asarray(((10.0, 20.0), (0.0, 10.0), (0.0, 10.0))))
+        left_keys = {key for key in left.boundary_correspondence_keys() if key}
+        right_keys = {key for key in right.boundary_correspondence_keys() if key}
+
+        self.assertEqual(left_keys & right_keys, {(0, 10.0, 2.0, 2.0)})
+
+    def test_source_node_on_patch_face_is_not_a_synthetic_intersection(self):
+        graph = SourceGraph(
+            nodes={
+                1: np.asarray((10.0, 2.0, 2.0)),
+                2: np.asarray((18.0, 2.0, 2.0)),
+            },
+            edges=[(1, 2)],
+            centerlines=[CenterlineEdge(1, 2, ())],
+        )
+
+        cropped = graph.crop(np.asarray(((0.0, 10.0),) * 3))
+
+        np.testing.assert_array_equal(cropped.boundary_intersections, (False,))
+        self.assertEqual(cropped.boundary_correspondence_keys(), (None,))
 
     def test_inherited_crop_uses_last_inside_sample(self):
         graph = SourceGraph(

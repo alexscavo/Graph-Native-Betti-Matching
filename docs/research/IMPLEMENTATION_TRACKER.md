@@ -218,6 +218,31 @@ centerline sample inside the patch, without an interpolated box-face node.
 Results and full-volume visualizations are in
 [`evidence/full_volume_then_crop/`](evidence/full_volume_then_crop/).
 
+## Exact boundary intersections selected (2026-09-18)
+
+Exact voxel-cell-face clipping is now the production patch policy. Full graphs
+are transformed into voxel coordinates and clipped against
+`[start - 0.5, start + crop_size - 0.5]`, which fixes world-axis-box errors for
+oblique affines and gives neighboring non-overlapping patches the same shared
+face. Synthetic intersection nodes retain `source_edge_index` and an explicit
+boundary flag in VTP, yielding deterministic cross-patch correspondence while
+remaining compatible with the existing model reader.
+
+The last-inside-sample policy remains an ablation. On real densest IXI122 and
+TopBrain-MR-001 patches it produced identical topology and token counts, but
+terminated crossing edges approximately 0.42 voxel inside the true face. Exact
+clipping therefore strictly improves boundary geometry without increasing the
+graph budget in these tests. Metrics, JSON, PNG, and interactive comparisons
+are in [`evidence/full_volume_then_crop/crop_policy_comparison/`](evidence/full_volume_then_crop/crop_policy_comparison/).
+
+The complete extraction inventory contains 220 paired volumes: 170 IXI MRA,
+25 TopBrain MR, 18 TopBrain CT training, and 7 labeled TopBrain CT test cases.
+The resumable CPU-array extractor skeletonizes every full segmentation once and
+writes separate junction-only, adaptive, and dense graph products. Adaptive is
+the selected training representation; the other two are retained for controlled
+comparison. Each volume has an atomic, configuration-fingerprinted completion
+marker.
+
 ## Change log
 
 - 2026-09-18: Created the tracker and organized the research documents under

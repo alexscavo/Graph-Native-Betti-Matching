@@ -33,9 +33,8 @@ from scripts.audit_synthetic_mri_grid import (
     SourceGraph,
     discover_sources,
     normalize_like_legacy,
-    patch_world_bounds,
+    patch_voxel_cell_bounds,
     read_splits,
-    world_to_voxel,
 )
 
 
@@ -351,20 +350,48 @@ def hardlink_patch(source: Path, destination: Path) -> None:
         ) from error
 
 
-def write_vtp_graph(path: Path, positions: np.ndarray, edges: np.ndarray) -> None:
-    """Write a minimal ASCII VTK PolyData graph readable by PyVista/VTK."""
+def write_vtp_graph(
+    path: Path,
+    positions: np.ndarray,
+    edges: np.ndarray,
+    *,
+    boundary_intersections: np.ndarray | None = None,
+    boundary_source_edges: np.ndarray | None = None,
+) -> None:
+    """Write a minimal VTP graph, optionally retaining crop-boundary provenance.
+
+    The extra point arrays are ignored by the existing training reader, preserving
+    its ``(nodes, edges)`` interface, but remain available for QC and deterministic
+    correspondence of truncation nodes across adjacent patches.
+    """
 
     positions = np.asarray(positions, dtype=np.float32).reshape(-1, 3)
     edges = np.asarray(edges, dtype=np.int64).reshape(-1, 2)
     if len(edges) and (edges.min() < 0 or edges.max() >= len(positions)):
         raise ValueError("Graph edge index is outside the point array")
+    if boundary_intersections is None:
+        boundary_intersections = np.zeros(len(positions), dtype=np.uint8)
+    boundary_intersections = np.asarray(
+        boundary_intersections, dtype=np.uint8
+    ).reshape(-1)
+    if boundary_source_edges is None:
+        boundary_source_edges = np.full(len(positions), -1, dtype=np.int64)
+    boundary_source_edges = np.asarray(boundary_source_edges, dtype=np.int64).reshape(-1)
+    if len(boundary_intersections) != len(positions) or len(boundary_source_edges) != len(positions):
+        raise ValueError("Boundary point metadata must match the point array")
     point_values = " ".join(f"{float(value):.9g}" for value in positions.reshape(-1))
     connectivity = " ".join(str(int(value)) for value in edges.reshape(-1))
     offsets = " ".join(str(2 * (index + 1)) for index in range(len(edges)))
+    boundary_values = " ".join(str(int(value)) for value in boundary_intersections)
+    source_edge_values = " ".join(str(int(value)) for value in boundary_source_edges)
     payload = f"""<?xml version=\"1.0\"?>
 <VTKFile type=\"PolyData\" version=\"0.1\" byte_order=\"LittleEndian\">
   <PolyData>
     <Piece NumberOfPoints=\"{len(positions)}\" NumberOfVerts=\"0\" NumberOfLines=\"{len(edges)}\" NumberOfStrips=\"0\" NumberOfPolys=\"0\">
+      <PointData>
+        <DataArray type=\"UInt8\" Name=\"is_patch_boundary_intersection\" format=\"ascii\">{boundary_values}</DataArray>
+        <DataArray type=\"Int64\" Name=\"source_edge_index\" format=\"ascii\">{source_edge_values}</DataArray>
+      </PointData>
       <Points>
         <DataArray type=\"Float32\" NumberOfComponents=\"3\" format=\"ascii\">{point_values}</DataArray>
       </Points>
@@ -462,6 +489,10 @@ def _generate_patient(task: Mapping[str, object]) -> dict[str, object]:
         normalized = None
         threshold = float(task["normalization_threshold"])
     graph = SourceGraph.from_directory(graph_directory)
+    # Crop in the image's voxel frame.  A world-axis-aligned bounding box is not
+    # the transformed patch box for rotated/sheared affines and can retain graph
+    # segments which are outside the actual image crop.
+    voxel_graph = graph.transformed(np.linalg.inv(raw_image.affine))
     positions = endpoint_grid_positions(raw_image.shape, crop_size, maximum_stride)
     if reuse_rows is not None and len(reuse_rows) != len(positions):
         raise ValueError(
@@ -506,13 +537,14 @@ def _generate_patient(task: Mapping[str, object]) -> dict[str, object]:
             image_std = float(reused["image_std"])
             foreground_voxels = int(reused["foreground_voxels"])
             foreground_fraction = float(reused["foreground_fraction"])
-        bounds = patch_world_bounds(start, crop_size, raw_image.affine)
-        inherited_crop = graph.crop_inherited(bounds)
-        cropped = graph.crop(bounds)
+        bounds = patch_voxel_cell_bounds(start, crop_size)
+        inherited_crop = voxel_graph.crop_inherited(bounds)
+        cropped = voxel_graph.crop(bounds)
         if len(cropped.positions):
-            voxel_positions = world_to_voxel(cropped.positions, raw_image.affine)
             local_positions = (
-                voxel_positions - np.asarray(start, dtype=np.float64) + np.asarray(pad)
+                cropped.positions
+                - np.asarray(start, dtype=np.float64)
+                + np.asarray(pad)
             )
             normalized_positions = local_positions / np.asarray(patch_size)
             minimum = float(normalized_positions.min())
@@ -544,6 +576,8 @@ def _generate_patient(task: Mapping[str, object]) -> dict[str, object]:
             output / split / "vtp" / f"{sample_id}_graph.vtp",
             normalized_positions,
             cropped.edges,
+            boundary_intersections=cropped.boundary_intersections,
+            boundary_source_edges=cropped.boundary_source_edges,
         )
         rows.append(
             {
@@ -753,7 +787,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     split_bytes = split_output.read_bytes()
     configuration = {
-        "format_version": 3,
+        "format_version": 4,
         "source_root": str(root),
         "split_sha256": hashlib.sha256(split_bytes).hexdigest(),
         "patch_size": list(patch_size),
@@ -762,7 +796,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "maximum_stride": list(args.maximum_stride),
         "grid": "endpoint_distributed_v1",
         "normalization": "legacy_mad_clip_v1",
-        "graph_crop": "endpoint_aware_closed_box_with_tangent_contacts_v3",
+        "graph_crop": "voxel_cell_box_endpoint_aware_with_boundary_provenance_v4",
         "selection_filter": None,
         "raw_seg_materialization": (
             "hardlink_from_existing" if reuse_patch_root is not None else "generated"

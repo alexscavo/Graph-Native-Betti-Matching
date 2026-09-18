@@ -34,3 +34,12 @@ These are deliberately density-maximizing patches, not dataset-wide
 percentiles. TopBrain is near the preferred 60–70-edge range; IXI is below the
 120-token hard capacity but above that preference. No parameter was tuned per
 dataset in this comparison.
+
+## Policy decision
+
+The follow-up real-data comparison in
+[`crop_policy_comparison/`](crop_policy_comparison/) selects exact clipping for
+production. Patch bounds now follow voxel-cell faces, and every generated
+intersection carries its source-edge index and a boundary-intersection flag.
+This makes shared-face intersections deterministic across adjacent patches.
+The inherited last-sample crop remains available only as a comparison ablation.

@@ -1,0 +1,93 @@
+{
+  "boundary": {
+    "boundary_recall": 1.0,
+    "exact_boundary_contacts": 22,
+    "inherited_terminal_candidates": 22,
+    "matched_boundary_contacts": 22,
+    "max_correspondence_distance": 1.1118181969626006,
+    "max_inherited_terminal_face_gap": 0.5546875,
+    "max_matched_inherited_face_gap": 0.5546875,
+    "mean_correspondence_distance": 0.6283935018744702,
+    "mean_inherited_terminal_face_gap": 0.41317471590908833,
+    "mean_matched_inherited_face_gap": 0.41317471590908833,
+    "missing_boundary_contacts": 0
+  },
+  "bounds": [
+    [
+      215.5,
+      279.5
+    ],
+    [
+      167.5,
+      231.5
+    ],
+    [
+      71.5,
+      135.5
+    ]
+  ],
+  "coordinate_system": "voxel",
+  "exact_topology": {
+    "components": 7,
+    "cycle_rank": 8,
+    "degree_2_nodes": 33,
+    "edges": 78,
+    "isolated_nodes": 0,
+    "junction_nodes": 22,
+    "nodes": 77,
+    "terminal_nodes": 22
+  },
+  "geometry": {
+    "average_centerline_distance": 0.0173260291379108,
+    "curve_f1": 0.9995845450768591,
+    "curve_precision": 1.0,
+    "curve_recall": 0.9991694352159468,
+    "hd95": 0.11796915102673748
+  },
+  "geometry_image": "/lustre/fsn1/projects/rech/vnc/upz25mj/datasets/TopBrain_Data_Release_Batches1n2_081425/labelsTr_topbrain_mr/topcow_mr_001.nii.gz",
+  "geometry_physical_mm": {
+    "average_centerline_distance": 0.0059700478255552015,
+    "curve_f1": 1.0,
+    "curve_precision": 1.0,
+    "curve_recall": 1.0,
+    "curve_tolerance_mm": 1.0,
+    "hd95": 0.03971179452171651,
+    "sample_spacing_mm": 0.14843749567514572
+  },
+  "graph_dir": "/lustre/fswork/projects/rech/vnc/upz25mj/projects/Graph-Native-Betti-Matching/docs/research/artifacts/full_volume_graphs/adaptive/TopBrain-MR-001-full",
+  "inherited_topology": {
+    "components": 7,
+    "cycle_rank": 8,
+    "degree_2_nodes": 33,
+    "edges": 78,
+    "isolated_nodes": 0,
+    "junction_nodes": 22,
+    "nodes": 77,
+    "terminal_nodes": 22
+  },
+  "settings": {
+    "boundary_tolerance": 1e-06,
+    "correspondence_tolerance": 3.0,
+    "curve_tolerance": 1.0,
+    "hard_token_budget": 120,
+    "preferred_edge_budget": 70,
+    "sample_spacing": 0.5
+  },
+  "tokens": {
+    "exact_edges": 78,
+    "exact_exceeds_hard_node_tokens": false,
+    "exact_exceeds_preferred_edges": true,
+    "exact_nodes": 77,
+    "inherited_edges": 78,
+    "inherited_exceeds_hard_node_tokens": false,
+    "inherited_exceeds_preferred_edges": true,
+    "inherited_nodes": 77
+  },
+  "topology_delta_inherited_minus_exact": {
+    "components": 0,
+    "cycle_rank": 0,
+    "edges": 0,
+    "isolated_nodes": 0,
+    "nodes": 0
+  }
+}

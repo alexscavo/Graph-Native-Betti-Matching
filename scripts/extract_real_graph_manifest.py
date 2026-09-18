@@ -1,0 +1,118 @@
+#!/usr/bin/env python3
+"""Resumably extract full-volume graph families listed in a CSV manifest."""
+
+from __future__ import annotations
+
+import argparse
+import csv
+from datetime import datetime, timezone
+import hashlib
+import json
+import os
+from pathlib import Path
+import sys
+import time
+
+import nibabel as nib
+import numpy as np
+
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from scripts.ixi_vessel_graph import build_representation_family, write_source_graph
+
+
+SCHEMA_VERSION = 1
+FILES = ("nodes.csv", "edges.csv", "graph.vvg")
+
+
+def configuration(args) -> dict:
+    return {
+        "schema_version": SCHEMA_VERSION, "centerline_backend": args.centerline_backend,
+        "rdp_voxels": args.rdp_voxels, "radius_fraction": args.radius_fraction,
+        "spur_length": args.spur_length, "max_junction_extent_mm": args.max_junction_extent_mm,
+        "smooth_iterations": args.smooth_iterations, "smooth_alpha": args.smooth_alpha,
+        "minimum_chord_fraction": args.minimum_chord_fraction,
+    }
+
+
+def process(row: dict[str, str], args) -> str:
+    destination = args.output / row["dataset"] / row["modality"] / row["split"] / row["subject"]
+    marker = destination / "complete.json"
+    config = configuration(args)
+    fingerprint = hashlib.sha256(json.dumps(config, sort_keys=True).encode()).hexdigest()[:16]
+    if marker.is_file() and not args.force:
+        old = json.loads(marker.read_text())
+        complete = old.get("configuration_fingerprint") == fingerprint
+        complete &= all((destination / "graphs" / name / filename).is_file()
+                        for name in ("junction_only", "adaptive", "dense") for filename in FILES)
+        if complete: return "skipped"
+
+    started = time.monotonic()
+    image, label = nib.load(row["image"]), nib.load(row["label"])
+    if image.shape != label.shape or not np.allclose(image.affine, label.affine, atol=1e-4):
+        raise ValueError(f"{row['subject']}: image/label geometry changed since planning")
+    segmentation = np.asanyarray(label.dataobj) > 0
+    spacing = np.sqrt((label.affine[:3, :3] ** 2).sum(axis=0))
+    graphs = build_representation_family(
+        segmentation, spacing=spacing,
+        adaptive_tolerance_mm=args.rdp_voxels * float(spacing.min()),
+        adaptive_radius_fraction=args.radius_fraction,
+        centerline_backend=args.centerline_backend,
+        spur_length=args.spur_length,
+        max_junction_extent_mm=args.max_junction_extent_mm,
+        smooth_iterations=args.smooth_iterations, smooth_alpha=args.smooth_alpha,
+        minimum_chord_fraction=args.minimum_chord_fraction,
+    )
+    for name, graph in graphs.items():
+        write_source_graph(destination / "graphs" / name, graph, label.affine, label.shape)
+    payload = {
+        **{key: row[key] for key in ("index", "dataset", "modality", "split", "subject", "image", "label")},
+        "configuration": config, "configuration_fingerprint": fingerprint,
+        "shape": list(label.shape), "spacing_mm": spacing.tolist(),
+        "foreground_voxels": int(segmentation.sum()),
+        "representations": {name: {"nodes": graph.node_count, "edges": graph.edge_count,
+            "betti_0": graph.betti()[0], "betti_1": graph.betti()[1]} for name, graph in graphs.items()},
+        "elapsed_seconds": time.monotonic() - started,
+        "completed_at": datetime.now(timezone.utc).isoformat(),
+    }
+    destination.mkdir(parents=True, exist_ok=True)
+    temporary = marker.with_suffix(".tmp")
+    temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    os.replace(temporary, marker)
+    return "done"
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--manifest", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--shard", type=int, default=int(os.getenv("SLURM_ARRAY_TASK_ID", "0")))
+    parser.add_argument("--num-shards", type=int, default=int(os.getenv("REAL_GRAPH_NUM_SHARDS", "1")))
+    parser.add_argument("--force", action="store_true")
+    parser.add_argument("--centerline-backend", choices=("legacy", "vedo"), default="legacy")
+    parser.add_argument("--rdp-voxels", type=float, default=2.0)
+    parser.add_argument("--radius-fraction", type=float, default=0.0)
+    parser.add_argument("--spur-length", type=int, default=4)
+    parser.add_argument("--max-junction-extent-mm", type=float, default=1.5)
+    parser.add_argument("--smooth-iterations", type=int, default=5)
+    parser.add_argument("--smooth-alpha", type=float, default=0.5)
+    parser.add_argument("--minimum-chord-fraction", type=float, default=1.0)
+    args = parser.parse_args()
+    if args.num_shards < 1 or not 0 <= args.shard < args.num_shards:
+        parser.error("shard must satisfy 0 <= shard < num-shards")
+    with args.manifest.open(newline="") as stream: rows = list(csv.DictReader(stream))
+    assigned = [row for index, row in enumerate(rows) if index % args.num_shards == args.shard]
+    print(f"shard {args.shard}/{args.num_shards}: {len(assigned)} of {len(rows)} volumes", flush=True)
+    failures = []
+    for position, row in enumerate(assigned, 1):
+        try:
+            state = process(row, args)
+            print(f"[{position}/{len(assigned)}] {row['subject']} {state}", flush=True)
+        except Exception as error:
+            failures.append(row["subject"]); print(f"{row['subject']} FAILED: {error}", flush=True)
+    if failures: raise SystemExit(f"failed ({len(failures)}): {', '.join(failures)}")
+
+
+if __name__ == "__main__":
+    main()

@@ -269,6 +269,43 @@ Model-only full-volume adaptive views (straight edges plus every termination,
 degree-2 subdivision, and junction; no centerline polylines) are recorded in
 [`evidence/full_volume_then_crop/adaptive_all_nodes/`](evidence/full_volume_then_crop/adaptive_all_nodes/).
 
+## Real-data adaptive-policy selection (2026-09-19)
+
+The pending Slurm sweep was cancelled and reproduced locally, sequentially, on
+14 real volumes (six IXI, four TopBrain CT, four TopBrain MR). The 72-million-
+voxel `topcow_ct_017` outlier is intentionally deferred. All policies were
+derived from saved full-volume dense graphs, then audited with exact 64³,
+stride-40 clipping; no crop-first skeletonization was used.
+
+The first sweep showed that fixed tolerances up to four voxels were not strong
+enough. A second sweep tested fixed 4/5/6-voxel and radius-aware 1/1.5/2×
+tolerances, all with a 95% minimum straight-chord lumen-containment constraint.
+Every policy preserved full-volume β₀/β₁ on 14/14 subjects. Radius-2× yields
+P95 98 edges per nonempty patch, 232/2326 patches above the preferred 70-edge
+level, and 63/2326 above 120 edges. Fixed-5 is marginally smaller (223 and 62),
+but its worst centerline error normalized by local vessel radius is 5.01×,
+versus 1.77× for radius-2×. Radius-2× also has slightly lower P95 geometric
+error (0.634 versus 0.644 mm) and length-weighted shortening (1.89% versus
+1.97%). It is therefore selected as the dataset-agnostic candidate: the small
+token penalty buys substantially safer behavior in thin vessels.
+
+An independent audit of every saved model edge found zero radius-2× edges below
+the configured 95% containment floor (13,393 edges total; mean containment
+99.81%). Budget data and plots are in
+[`evidence/adaptive_tuning/results_stage2_14/`](evidence/adaptive_tuning/results_stage2_14/),
+geometry data and plots in
+[`evidence/adaptive_tuning/geometry_14/`](evidence/adaptive_tuning/geometry_14/),
+and graph-only PNG/interactive HTML views for IXI425 and TopBrain-MR-002 in
+[`evidence/adaptive_tuning/selected_radius2x/`](evidence/adaptive_tuning/selected_radius2x/).
+
+The audit also exposed and fixed a serialization defect: six-decimal world
+coordinates in `nodes.csv` could move a junction by approximately 1e-7 voxel
+across a voxel-cell face after reloading. Node coordinates now use 12 decimal
+places, legacy tuning inputs recover full-precision nodes from `graph.vvg`, and
+a regression test checks preservation of voxel-cell side. Forced tuning runs
+now invalidate stale completion markers before overwriting artifacts, so an
+interruption cannot masquerade as a completed regeneration.
+
 ## Change log
 
 - 2026-09-18: Created the tracker and organized the research documents under

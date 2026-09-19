@@ -22,7 +22,7 @@ if __package__ in {None, ""}:
 from scripts.ixi_vessel_graph import build_representation_family, write_source_graph
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 FILES = ("nodes.csv", "edges.csv", "graph.vvg")
 
 
@@ -91,13 +91,13 @@ def main() -> None:
     parser.add_argument("--num-shards", type=int, default=int(os.getenv("REAL_GRAPH_NUM_SHARDS", "1")))
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--centerline-backend", choices=("legacy", "vedo"), default="legacy")
-    parser.add_argument("--rdp-voxels", type=float, default=2.0)
-    parser.add_argument("--radius-fraction", type=float, default=0.0)
+    parser.add_argument("--rdp-voxels", type=float, default=0.0)
+    parser.add_argument("--radius-fraction", type=float, default=2.0)
     parser.add_argument("--spur-length", type=int, default=4)
     parser.add_argument("--max-junction-extent-mm", type=float, default=1.5)
     parser.add_argument("--smooth-iterations", type=int, default=5)
     parser.add_argument("--smooth-alpha", type=float, default=0.5)
-    parser.add_argument("--minimum-chord-fraction", type=float, default=1.0)
+    parser.add_argument("--minimum-chord-fraction", type=float, default=0.95)
     args = parser.parse_args()
     if args.num_shards < 1 or not 0 <= args.shard < args.num_shards:
         parser.error("shard must satisfy 0 <= shard < num-shards")

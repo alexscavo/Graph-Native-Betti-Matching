@@ -1347,7 +1347,11 @@ def write_source_graph(
     node_rows = ["id;pos_x;pos_y;pos_z;degree;isAtSampleBorder"]
     for index, position in enumerate(world_nodes):
         node_rows.append(
-            f"{index};{position[0]:.6f};{position[1]:.6f};{position[2]:.6f};"
+            # Keep enough precision for a world->voxel round trip to preserve which
+            # side of a voxel-cell face the node occupies. Six decimals displaced
+            # real IXI junctions by ~1e-7 voxel and could make a valid short edge
+            # appear outside the segmentation after reloading.
+            f"{index};{position[0]:.12f};{position[1]:.12f};{position[2]:.12f};"
             f"{int(graph.node_degrees[index])};{int(at_border[index])}"
         )
     _atomic_write(directory / "nodes.csv", "\n".join(node_rows) + "\n")

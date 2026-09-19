@@ -5,12 +5,14 @@ from __future__ import annotations
 import numpy as np
 from unittest.mock import patch
 
-from scripts.audit_synthetic_mri_grid import discover_sources
+from scripts.audit_synthetic_mri_grid import SourceGraph, discover_sources, world_to_voxel
 from scripts.ixi_vessel_graph import (
+    VesselGraph,
     adaptive_tolerance_profile,
     build_representation_family,
     build_vessel_graph,
     rdp_keep_mask,
+    write_source_graph,
 )
 from scripts.prepare_ixi_sources import segmentation_path
 
@@ -184,3 +186,30 @@ def test_radius_aware_rdp_retains_more_geometry_in_thin_than_thick_vessels():
 
     assert thin_keep.sum() > thick_keep.sum()
     np.testing.assert_array_equal(thick_keep, (True, False, False, False, True))
+
+
+def test_source_graph_node_serialization_preserves_voxel_cell_side(tmp_path):
+    affine = np.asarray(
+        ((-0.46875, 0.0, 0.0, 64.511681234567),
+         (0.0, 0.46875, 0.0, -63.292368765432),
+         (0.0, 0.0, 0.421, 4.690878123456),
+         (0.0, 0.0, 0.0, 1.0))
+    )
+    positions = np.asarray(((50.75, 211.25, 34.5000003), (51.0, 212.0, 34.0)))
+    graph = VesselGraph(
+        node_positions=positions,
+        node_degrees=np.asarray((1, 1)),
+        edges=[(0, 1)],
+        centerlines=[positions.copy()],
+        node_radii=np.ones(2),
+    )
+
+    write_source_graph(tmp_path, graph, affine, (100, 250, 100))
+    reloaded = SourceGraph.from_directory(tmp_path)
+    round_trip = world_to_voxel(reloaded.node_positions, affine)
+
+    np.testing.assert_allclose(round_trip, positions, atol=1e-9, rtol=0.0)
+    np.testing.assert_array_equal(
+        np.floor(round_trip + 0.5).astype(int),
+        np.floor(positions + 0.5).astype(int),
+    )

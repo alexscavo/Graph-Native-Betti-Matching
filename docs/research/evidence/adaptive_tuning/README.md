@@ -36,3 +36,18 @@ node/edge mean, P95, P99, maximum, and counts above 70 and 120.
 Radius-aware tolerance is an alternative to fixed tolerance, not a fixed-limit
 modifier. This is required for the intended behavior: thick straight vessels
 may use longer edges, while thin vessels receive a tighter geometric bound.
+
+## Completed real-data decision (2026-09-19)
+
+The sweep completed locally on 14 ordinary-sized volumes; the 72-million-voxel
+`topcow_ct_017` outlier is intentionally deferred. A stronger second stage
+tested fixed 4/5/6-voxel and radius-aware 1/1.5/2× policies at 95% minimum chord
+containment. All candidates preserved topology on 14/14 subjects.
+
+Radius-2× is selected for production. Fixed-5 has a marginally smaller patch
+tail, but radius-2× controls errors in thin vessels much better: the maximum
+edge error normalized by median local radius is 1.77× rather than 5.01×. Its
+P95 edge maximum error is 0.634 mm, length-weighted shortening is 1.89%, and
+none of 13,393 audited edges falls below 95% lumen containment. Exact 64³ crop
+statistics are in `results_stage2_14/`, all-edge geometry evidence in
+`geometry_14/`, and two graph-only real-data viewers in `selected_radius2x/`.

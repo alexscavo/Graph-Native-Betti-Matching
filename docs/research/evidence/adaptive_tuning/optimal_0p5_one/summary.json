@@ -1,0 +1,26 @@
+[
+  {
+    "candidate": "optimal_radius_0p5x",
+    "subjects": 1,
+    "edges": 1658,
+    "maximum_error_mm": {
+      "mean": 0.13742382851456414,
+      "median": 0.14270910364128936,
+      "p95": 0.32163695965690076,
+      "p99": 0.4197769517539688,
+      "max": 0.8261333430814931
+    },
+    "max_error_over_median_radius": {
+      "mean": 0.1879384802482408,
+      "median": 0.20262847719320656,
+      "p95": 0.42218315108838683,
+      "p99": 0.47849896743830667,
+      "max": 0.499676090528257
+    },
+    "length_weighted_relative_length_error": 0.011497486761205312,
+    "containment_mean": 0.9977559813345183,
+    "containment_p05": 0.9721031746031746,
+    "edges_below_95pct_containment": 0,
+    "fully_contained_edges": 1561
+  }
+]

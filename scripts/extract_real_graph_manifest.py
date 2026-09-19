@@ -22,7 +22,7 @@ if __package__ in {None, ""}:
 from scripts.ixi_vessel_graph import build_representation_family, write_source_graph
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 FILES = ("nodes.csv", "edges.csv", "graph.vvg")
 
 
@@ -30,6 +30,7 @@ def configuration(args) -> dict:
     return {
         "schema_version": SCHEMA_VERSION, "centerline_backend": args.centerline_backend,
         "rdp_voxels": args.rdp_voxels, "radius_fraction": args.radius_fraction,
+        "simplification_method": args.simplification_method,
         "spur_length": args.spur_length, "max_junction_extent_mm": args.max_junction_extent_mm,
         "smooth_iterations": args.smooth_iterations, "smooth_alpha": args.smooth_alpha,
         "minimum_chord_fraction": args.minimum_chord_fraction,
@@ -63,6 +64,7 @@ def process(row: dict[str, str], args) -> str:
         max_junction_extent_mm=args.max_junction_extent_mm,
         smooth_iterations=args.smooth_iterations, smooth_alpha=args.smooth_alpha,
         minimum_chord_fraction=args.minimum_chord_fraction,
+        simplification_method=args.simplification_method,
     )
     for name, graph in graphs.items():
         write_source_graph(destination / "graphs" / name, graph, label.affine, label.shape)
@@ -92,7 +94,8 @@ def main() -> None:
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--centerline-backend", choices=("legacy", "vedo"), default="legacy")
     parser.add_argument("--rdp-voxels", type=float, default=0.0)
-    parser.add_argument("--radius-fraction", type=float, default=1.5)
+    parser.add_argument("--radius-fraction", type=float, default=0.75)
+    parser.add_argument("--simplification-method", choices=("rdp", "optimal"), default="optimal")
     parser.add_argument("--spur-length", type=int, default=4)
     parser.add_argument("--max-junction-extent-mm", type=float, default=1.5)
     parser.add_argument("--smooth-iterations", type=int, default=5)

@@ -11,6 +11,7 @@ from scripts.ixi_vessel_graph import (
     adaptive_tolerance_profile,
     build_representation_family,
     build_vessel_graph,
+    optimal_keep_mask,
     rdp_keep_mask,
     write_source_graph,
 )
@@ -186,6 +187,88 @@ def test_radius_aware_rdp_retains_more_geometry_in_thin_than_thick_vessels():
 
     assert thin_keep.sum() > thick_keep.sum()
     np.testing.assert_array_equal(thick_keep, (True, False, False, False, True))
+
+
+def test_optimal_simplifier_uses_fewer_nodes_than_greedy_rdp_when_possible():
+    polyline = np.asarray(
+        ((1.0, 0.57551092, -0.58791274),
+         (2.0, 0.09683346, -0.70991223),
+         (3.0, 0.54560930, -0.19933186),
+         (4.0, 0.11979837, -0.56365017),
+         (5.0, -0.35889538, -0.91419311),
+         (6.0, -0.50164940, -0.99328213))
+    )
+
+    greedy = rdp_keep_mask(polyline, 0.5)
+    optimal = optimal_keep_mask(polyline, 0.5)
+
+    assert greedy.sum() == 4
+    assert optimal.sum() == 3
+
+
+def test_optimal_simplifier_node_count_is_monotonic_with_tolerance():
+    polyline = np.asarray(
+        ((0.0, 0.0, 0.0), (1.0, 0.5, 0.0), (2.0, -0.4, 0.0),
+         (3.0, 0.7, 0.0), (4.0, -0.2, 0.0), (5.0, 0.0, 0.0))
+    )
+
+    strict = optimal_keep_mask(polyline, 0.25)
+    relaxed = optimal_keep_mask(polyline, 0.75)
+
+    assert relaxed.sum() <= strict.sum()
+
+
+def test_optimal_simplifier_measures_distance_to_finite_chord():
+    # All points lie on the same infinite line, but the middle point overshoots
+    # the finite start/end chord and must therefore remain at a tight tolerance.
+    polyline = np.asarray(
+        ((0.0, 0.0, 0.0), (2.0, 0.0, 0.0), (1.0, 0.0, 0.0))
+    )
+
+    keep = optimal_keep_mask(polyline, 0.1)
+
+    np.testing.assert_array_equal(keep, (True, True, True))
+
+
+def test_optimal_simplifier_enforces_lumen_containment():
+    voxel_polyline = np.asarray(
+        ((2.0, 2.0, 0.0), (2.0, 6.0, 0.0), (6.0, 6.0, 0.0),
+         (6.0, 2.0, 0.0))
+    )
+    mask = np.zeros((9, 9, 3), dtype=bool)
+    for left, right in zip(voxel_polyline[:-1], voxel_polyline[1:]):
+        samples = left + np.linspace(0.0, 1.0, 20)[:, None] * (right - left)
+        indices = np.rint(samples).astype(int)
+        mask[indices[:, 0], indices[:, 1], indices[:, 2]] = True
+
+    unconstrained = optimal_keep_mask(voxel_polyline, 10.0)
+    contained = optimal_keep_mask(
+        voxel_polyline,
+        10.0,
+        voxel_polyline=voxel_polyline,
+        mask=mask,
+        minimum_chord_fraction=1.0,
+    )
+
+    assert unconstrained.sum() == 2
+    assert contained.sum() > unconstrained.sum()
+
+
+def test_optimal_representation_family_preserves_topology_and_never_exceeds_rdp():
+    shared = dict(
+        segmentation=_square_ring_mask(),
+        spacing=(0.5, 0.5, 0.8),
+        adaptive_tolerance_mm=0.8,
+        spur_length=0,
+        smooth_iterations=0,
+        minimum_chord_fraction=1.0,
+    )
+
+    greedy = build_representation_family(**shared, simplification_method="rdp")
+    optimal = build_representation_family(**shared, simplification_method="optimal")
+
+    assert optimal["adaptive"].betti() == greedy["adaptive"].betti() == (1, 1)
+    assert optimal["adaptive"].node_count <= greedy["adaptive"].node_count
 
 
 def test_source_graph_node_serialization_preserves_voxel_cell_side(tmp_path):

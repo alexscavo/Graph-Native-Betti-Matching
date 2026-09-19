@@ -114,7 +114,7 @@ def main() -> int:
             **{f"edges_{key}": value for key, value in record["patch_edges"].items()},
         })
     with (args.output_dir / "summary.csv").open("w", newline="") as stream:
-        writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
+        writer = csv.DictWriter(stream, fieldnames=list(rows[0]), lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
 

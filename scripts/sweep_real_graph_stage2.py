@@ -40,6 +40,16 @@ POLICIES = [
     {"name": "radius_1x_c095", "tolerance_voxels": 0.0, "radius_fraction": 1.0},
     {"name": "radius_1p5x_c095", "tolerance_voxels": 0.0, "radius_fraction": 1.5},
     {"name": "radius_2x_c095", "tolerance_voxels": 0.0, "radius_fraction": 2.0},
+    {"name": "optimal_radius_1p5x_c095", "tolerance_voxels": 0.0,
+     "radius_fraction": 1.5, "simplification_method": "optimal"},
+    {"name": "optimal_radius_1p25x_c095", "tolerance_voxels": 0.0,
+     "radius_fraction": 1.25, "simplification_method": "optimal"},
+    {"name": "optimal_radius_1x_c095", "tolerance_voxels": 0.0,
+     "radius_fraction": 1.0, "simplification_method": "optimal"},
+    {"name": "optimal_radius_0p75x_c095", "tolerance_voxels": 0.0,
+     "radius_fraction": 0.75, "simplification_method": "optimal"},
+    {"name": "optimal_radius_0p5x_c095", "tolerance_voxels": 0.0,
+     "radius_fraction": 0.5, "simplification_method": "optimal"},
 ]
 
 
@@ -94,13 +104,14 @@ def process(row: dict[str, str], args) -> str:
     spacing = np.sqrt((label.affine[:3, :3] ** 2).sum(axis=0))
     dense = load_dense(source_subject / "graphs" / "dense", label.affine, mask, spacing)
     graphs = {}
-    for policy in POLICIES:
+    for policy in args.policies:
         graphs[policy["name"]] = derive_graph_from_dense(
             dense,
             representation="adaptive",
             adaptive_tolerance_mm=policy["tolerance_voxels"] * float(spacing.min()),
             adaptive_radius_fraction=policy["radius_fraction"],
             minimum_chord_fraction=0.95,
+            simplification_method=policy.get("simplification_method", "rdp"),
         )
     for name, graph in graphs.items():
         write_source_graph(target / "graphs" / name, graph, label.affine, label.shape)
@@ -134,7 +145,7 @@ def process(row: dict[str, str], args) -> str:
     dense_record = json.loads((source_subject / "complete.json").read_text())["representations"]["dense"]
     payload = {
         **{key: row[key] for key in ("index", "dataset", "modality", "split", "subject", "image", "label")},
-        "configuration": {"policies": POLICIES, "minimum_chord_fraction": 0.95,
+        "configuration": {"policies": args.policies, "minimum_chord_fraction": 0.95,
                           "dense_source": str((source_subject / "graphs" / "dense").resolve())},
         "dense_extractions": 0,
         "shape": list(label.shape), "spacing_mm": spacing.tolist(),
@@ -160,8 +171,13 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--subject", action="append", dest="subjects",
                         help="Process only this subject (repeatable).")
+    parser.add_argument("--policy", action="append", dest="policy_names",
+                        choices=[policy["name"] for policy in POLICIES],
+                        help="Derive only this policy (repeatable).")
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
+    selected = set(args.policy_names or (policy["name"] for policy in POLICIES))
+    args.policies = [policy for policy in POLICIES if policy["name"] in selected]
     with args.manifest.open(newline="") as stream:
         rows = list(csv.DictReader(stream))
     if args.subjects:

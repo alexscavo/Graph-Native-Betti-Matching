@@ -163,7 +163,7 @@ def main() -> int:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     (args.output_dir / "summary.json").write_text(json.dumps(summaries, indent=2) + "\n")
     with (args.output_dir / "edges.csv").open("w", newline="") as stream:
-        writer = csv.DictWriter(stream, fieldnames=list(all_rows[0]))
+        writer = csv.DictWriter(stream, fieldnames=list(all_rows[0]), lineterminator="\n")
         writer.writeheader()
         writer.writerows(all_rows)
     plot(summaries, args.output_dir / "geometry_comparison.png")

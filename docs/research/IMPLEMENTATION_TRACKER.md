@@ -14,8 +14,10 @@ screenshot under `evidence/<task-id>/` so results can be independently reviewed.
 
 ## Current position
 
-- Current phase: Phase 2 — implement representation-quality metrics.
-- Next task: implement representation geometry, morphology, and complexity metrics.
+- Current phase: Phase 2 — representation-quality metrics and real-data policy selection.
+- Next task: finish morphology metrics, audit the selected policy on the 219
+  ordinary-sized volumes, and confirm the query capacity from that distribution.
+  Keep the 72-million-voxel `topcow_ct_017` outlier deferred for now.
 - Training changes: prohibited until the representation study is complete.
 
 ## Ordered task list
@@ -26,8 +28,8 @@ screenshot under `evidence/<task-id>/` so results can be independently reviewed.
 | T02 | Enforce the IXI638/IXI661 annotation overrides and record provenance | 1 | complete |
 | T03 | Emit junction-only, adaptive, and dense comparison representations | 1 | complete |
 | T04 | Preserve and name an immutable dense reference before simplification | 1 | complete |
-| T05 | Implement representation geometry, morphology, and complexity metrics | 2 | not started |
-| T06 | Run the rate-distortion study across sites and acquisition resolutions | 2 | not started |
+| T05 | Implement representation geometry, morphology, and complexity metrics | 2 | in progress |
+| T06 | Run the rate-distortion study across sites and acquisition resolutions | 2 | in progress |
 | T07 | Implement degree-2 contraction, physical anchor matching, and Branch F1 | 3 | not started |
 | T08 | Validate metrics on the prescribed handcrafted failure cases | 4 | not started |
 | T09 | Generate/smoke-test IXI patches and retrain with optimization unchanged | 5 | not started |
@@ -76,6 +78,33 @@ screenshot under `evidence/<task-id>/` so results can be independently reviewed.
 - Reason: smoothing is an intentional geometric transformation. Its distortion
   must be visible in the representation study instead of being silently folded
   into the reference.
+
+### D05 — Global constrained-optimal adaptive simplification
+
+- Date: 2026-09-19
+- Status: accepted for full-dataset validation
+- Decision: derive the adaptive graph once per full volume with the exact
+  minimum-segment path through each dense branch. A candidate chord is valid
+  only when its physical deviation is no greater than `0.75 ×` the minimum
+  local lumen radius on the interval and at least 95% of its samples lie in the
+  segmentation. Crop this fixed graph afterward using exact boundary
+  intersections; never re-simplify individual patches.
+- Reason: the shortest path on the ordered dense samples is globally optimal
+  for the stated constraints and has monotonic complexity as tolerance is
+  relaxed. On 14 real volumes it uses fewer degree-2 nodes than greedy RDP while
+  also reducing P95 and worst-case centerline error.
+
+### D06 — Handle graph-token overflow with uniform capacity
+
+- Date: 2026-09-19
+- Status: provisional pending the ordinary-volume inventory audit
+- Decision: retain the single global graph representation and use 192 object
+  queries for the real-data experiment. The data pipeline and loss must fail
+  explicitly when a target exceeds the configured capacity.
+- Reason: 45 of 2,326 nonempty 64³ patches exceed 120 nodes under D05, but none
+  exceeds 192. Topological plus exact-boundary nodes have a maximum of 81;
+  geometry nodes explain every observed overflow. Patch-specific simplification
+  would make the target representation depend on crop placement.
 
 ## Evidence log
 
@@ -269,7 +298,7 @@ Model-only full-volume adaptive views (straight edges plus every termination,
 degree-2 subdivision, and junction; no centerline polylines) are recorded in
 [`evidence/full_volume_then_crop/adaptive_all_nodes/`](evidence/full_volume_then_crop/adaptive_all_nodes/).
 
-## Real-data adaptive-policy selection (2026-09-19)
+## Initial greedy-RDP policy selection, now superseded (2026-09-19)
 
 The pending Slurm sweep was cancelled and reproduced locally, sequentially, on
 14 real volumes (six IXI, four TopBrain CT, four TopBrain MR). The 72-million-
@@ -285,8 +314,8 @@ audit selected radius-1.5× rather than radius-2×: it lowers P95 maximum error
 from 0.634 to 0.603 mm, length-weighted shortening from 1.89% to 1.80%, and the
 worst error normalized by local radius from 1.77× to 1.50×. The cost is about
 1% more full-volume edges; patch P95 changes from 99 to 100.5 nodes and the
-number of patches above 120 changes from 59 to 57. Radius-1.5× is therefore the
-selected global dataset-agnostic policy.
+number of patches above 120 changes from 59 to 57. Radius-1.5× was therefore the
+initial global dataset-agnostic policy before the exact solver below.
 
 An independent audit found zero radius-1.5× edges below the configured 95%
 containment floor (13,527 edges total; mean containment 99.82%). Budget data and plots are in
@@ -317,6 +346,41 @@ a regression test checks preservation of voxel-cell side. Forced tuning runs
 now invalidate stale completion markers before overwriting artifacts, so an
 interruption cannot masquerade as a completed regeneration.
 
+## Global optimal simplification selected (2026-09-19)
+
+Greedy RDP followed by containment repair was replaced by a constrained
+shortest-path solver over each full-volume dense branch. The solver retains the
+fewest dense samples whose chords satisfy both the local physical-error profile
+and the lumen-containment requirement. This is performed before cropping, so
+all overlapping or neighboring patches inherit the same graph and matching
+face-intersection nodes.
+
+The final 14-volume comparison selected optimal radius-0.75× at 95% minimum
+chord containment over the previous greedy radius-1.5× baseline. Both preserve
+topology on 14/14 volumes and neither has an audited edge below 95%
+containment. The selected policy changes:
+
+- full-volume degree-2 nodes: 9,682 → 8,962 (-7.4%);
+- P95 patch nodes: 100.5 → 95;
+- patches above 120 nodes: 57 → 45 (-21.1%);
+- P95 edge maximum error: 0.603 → 0.585 mm;
+- worst edge maximum error: 2.736 → 1.913 mm (-30.1%);
+- length-weighted shortening: 1.80% → 1.94%.
+
+The last change is the measured cost: the exact optimizer uses its allowed
+deviation more consistently, producing slightly more average shortening even
+though its P95 and maximum errors improve. On the IXI068 calibration volume,
+optimal radius-0.5× further improves geometry but exceeds the RDP baseline edge
+count; radius-1× and 1.25× are more aggressive than desired. Data, a direct
+comparison plot, overflow
+decomposition, and interactive IXI/TopBrain graph viewers are in
+[`evidence/adaptive_tuning/`](evidence/adaptive_tuning/).
+
+Stratified patch counts improve for IXI MRA and TopBrain CT. TopBrain MR is
+approximately neutral: mean nodes remain 16.1, P95 changes from 45 to 46, and
+patches above 70 change from 4 to 7, with a maximum of 115. The policy is thus a
+promising dataset-agnostic rule, not yet a completed transferability claim.
+
 ## Change log
 
 - 2026-09-18: Created the tracker and organized the research documents under
@@ -332,3 +396,6 @@ interruption cannot masquerade as a completed regeneration.
 - 2026-09-18: Completed T04 by defining `dense` as the immutable centerline
   before smoothing and RDP, recording the policy in provenance, and bumping the
   representation schema so old completion markers cannot skip regeneration.
+- 2026-09-19: Replaced greedy RDP plus repair with exact constrained branch
+  simplification, selected radius-0.75× on 14 real volumes, and retained uniform
+  192-query handling rather than patch-specific target changes.

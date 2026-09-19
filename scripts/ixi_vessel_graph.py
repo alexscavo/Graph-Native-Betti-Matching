@@ -487,6 +487,107 @@ def enforce_chord_containment(
     return refined
 
 
+def optimal_keep_mask(
+    physical_polyline: np.ndarray,
+    tolerance,
+    *,
+    voxel_polyline: np.ndarray | None = None,
+    mask: np.ndarray | None = None,
+    minimum_chord_fraction: float = 1.0,
+) -> np.ndarray:
+    """Retain the fewest dense samples satisfying geometry and containment.
+
+    Dense sample indices form a directed acyclic graph.  An arc ``i -> j`` is
+    valid exactly when replacing samples ``i..j`` by their straight chord stays
+    within the configured physical error and, when requested, inside the lumen.
+    A shortest path from the first to last sample therefore gives the global
+    minimum number of segments (and degree-2 subdivision nodes) for that branch.
+
+    Unlike greedy RDP followed by repair, relaxing either constraint can only add
+    valid arcs, so the optimal retained-node count cannot increase.
+    """
+
+    points = np.asarray(physical_polyline, dtype=np.float64)
+    if points.ndim != 2 or points.shape[1] != 3:
+        raise ValueError("physical_polyline must have shape [N,3]")
+    count = len(points)
+    keep = np.zeros(count, dtype=bool)
+    if count == 0:
+        return keep
+    keep[0] = keep[-1] = True
+    if count < 3:
+        return keep
+    if not 0.0 <= minimum_chord_fraction <= 1.0:
+        raise ValueError("minimum_chord_fraction must lie in [0,1]")
+
+    scalar = np.isscalar(tolerance)
+    if scalar:
+        fixed_limit = float(tolerance)
+        if fixed_limit < 0:
+            raise ValueError("tolerance must be non-negative")
+        limits = None
+    else:
+        limits = np.asarray(tolerance, dtype=np.float64)
+        if limits.shape != (count,) or np.any(limits < 0) or not np.isfinite(limits).all():
+            raise ValueError("tolerance profile must contain one finite non-negative value per sample")
+        fixed_limit = 0.0
+
+    if (voxel_polyline is None) != (mask is None):
+        raise ValueError("voxel_polyline and mask must be provided together")
+    voxel = None
+    if voxel_polyline is not None:
+        voxel = np.asarray(voxel_polyline, dtype=np.float64)
+        if voxel.shape != points.shape:
+            raise ValueError("voxel_polyline must match physical_polyline")
+
+    def valid(start: int, end: int) -> bool:
+        if end - start > 1:
+            anchor, tip = points[start], points[end]
+            direction = tip - anchor
+            squared_length = float(direction @ direction)
+            interior = points[start + 1 : end]
+            if squared_length < 1e-18:
+                distances = np.linalg.norm(interior - anchor, axis=1)
+            else:
+                fraction = np.clip(
+                    ((interior - anchor) @ direction) / squared_length,
+                    0.0,
+                    1.0,
+                )
+                projection = anchor + fraction[:, None] * direction
+                distances = np.linalg.norm(interior - projection, axis=1)
+            limit = fixed_limit if scalar else float(limits[start : end + 1].min())
+            if float(distances.max(initial=0.0)) > limit + 1e-12:
+                return False
+        if voxel is not None and chord_mask_fraction(
+            voxel[start], voxel[end], mask
+        ) + 1e-12 < minimum_chord_fraction:
+            return False
+        return True
+
+    unreachable = count + 1
+    segments = np.full(count, unreachable, dtype=np.int64)
+    predecessor = np.full(count, -1, dtype=np.int64)
+    segments[0] = 0
+    for end in range(1, count):
+        for start in range(end):
+            if segments[start] == unreachable or not valid(start, end):
+                continue
+            candidate = int(segments[start]) + 1
+            if candidate < segments[end]:
+                segments[end] = candidate
+                predecessor[end] = start
+    if predecessor[-1] < 0:
+        raise RuntimeError("no valid simplification path; adjacent dense samples must remain feasible")
+
+    current = count - 1
+    while current > 0:
+        keep[current] = True
+        current = int(predecessor[current])
+    keep[0] = True
+    return keep
+
+
 def _branch_polylines(
     adjacency: list[list[int]],
     dead: set[int],
@@ -1103,6 +1204,7 @@ def derive_graph_from_dense(
     smooth_alpha: float = 0.5,
     enforce_lumen_containment: bool = True,
     minimum_chord_fraction: float = 1.0,
+    simplification_method: str = "rdp",
 ) -> VesselGraph:
     """Derive one compact representation without repeating skeletonization.
 
@@ -1126,6 +1228,8 @@ def derive_graph_from_dense(
         raise ValueError("min_tolerance_mm must be non-negative")
     if not 0.0 <= minimum_chord_fraction <= 1.0:
         raise ValueError("minimum_chord_fraction must lie in [0, 1]")
+    if simplification_method not in {"rdp", "optimal"}:
+        raise ValueError("simplification_method must be 'rdp' or 'optimal'")
     from scipy.ndimage import distance_transform_edt
 
     source = dense.graph
@@ -1168,12 +1272,21 @@ def derive_graph_from_dense(
                 )
             else:
                 limit = adaptive_tolerance_mm
-            keep = rdp_keep_mask(polyline * dense.spacing, limit)
-            if enforce_lumen_containment:
-                keep = enforce_chord_containment(
-                    polyline, keep, dense.segmentation,
-                    minimum_fraction=minimum_chord_fraction,
+            if simplification_method == "optimal":
+                keep = optimal_keep_mask(
+                    polyline * dense.spacing,
+                    limit,
+                    voxel_polyline=polyline if enforce_lumen_containment else None,
+                    mask=dense.segmentation if enforce_lumen_containment else None,
+                    minimum_chord_fraction=minimum_chord_fraction,
                 )
+            else:
+                keep = rdp_keep_mask(polyline * dense.spacing, limit)
+                if enforce_lumen_containment:
+                    keep = enforce_chord_containment(
+                        polyline, keep, dense.segmentation,
+                        minimum_fraction=minimum_chord_fraction,
+                    )
         retained = np.flatnonzero(keep)
         previous_node = output_index[path[0]]
         previous_sample = 0
@@ -1220,6 +1333,7 @@ def build_representation_family(
     centerline_backend: str = "legacy",
     enforce_lumen_containment: bool = True,
     minimum_chord_fraction: float = 1.0,
+    simplification_method: str = "rdp",
     **shared_options,
 ) -> dict[str, VesselGraph]:
     """Build the three Phase-1 comparison representations.
@@ -1228,7 +1342,7 @@ def build_representation_family(
     only in the degree-2 geometry samples retained along each branch:
 
     - ``junction_only`` retains no degree-2 geometry nodes;
-    - ``adaptive`` retains the minimum RDP-selected geometry nodes;
+    - ``adaptive`` retains geometry nodes selected by the configured simplifier;
     - ``dense`` retains every sample on the raw post-topology-cleanup centerline,
       before smoothing or RDP simplification.
 
@@ -1251,6 +1365,7 @@ def build_representation_family(
         smooth_alpha=smooth_alpha,
         enforce_lumen_containment=enforce_lumen_containment,
         minimum_chord_fraction=minimum_chord_fraction,
+        simplification_method=simplification_method,
     )
     return {
         "junction_only": derive_graph_from_dense(dense, "junction_only", **derivation),

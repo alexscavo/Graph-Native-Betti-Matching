@@ -44,10 +44,17 @@ The sweep completed locally on 14 ordinary-sized volumes; the 72-million-voxel
 tested fixed 4/5/6-voxel and radius-aware 1/1.5/2× policies at 95% minimum chord
 containment. All candidates preserved topology on 14/14 subjects.
 
-Radius-2× is selected for production. Fixed-5 has a marginally smaller patch
-tail, but radius-2× controls errors in thin vessels much better: the maximum
-edge error normalized by median local radius is 1.77× rather than 5.01×. Its
-P95 edge maximum error is 0.634 mm, length-weighted shortening is 1.89%, and
-none of 13,393 audited edges falls below 95% lumen containment. Exact 64³ crop
-statistics are in `results_stage2_14/`, all-edge geometry evidence in
-`geometry_14/`, and two graph-only real-data viewers in `selected_radius2x/`.
+Radius-1.5× is selected for production. It improves on radius-2× with P95 edge
+maximum error 0.603 mm, length-weighted shortening 1.80%, and maximum error
+1.50 times the local median radius. None of 13,527 audited edges falls below
+95% lumen containment. It adds only about 1% more edges than radius-2×, while
+the observed patch maximum remains 186 nodes. Exact 64³ crop statistics are in
+`results_stage2_14/`, all-edge geometry evidence in `geometry_radius1p5_14/`,
+and two graph-only real-data viewers in `selected_radius1p5x/`.
+
+`overflow_14/` shows why patches exceed 120 nodes. The maximum topological plus
+exact-boundary requirement is only 81 nodes; degree-2 geometry nodes account
+for every overflow. We do not simplify those patches independently. A uniform
+192-query real-data configuration covers every observed patch, while keeping
+one globally defined graph representation. The complete dataset must be
+audited before 192 becomes a guaranteed final bound.

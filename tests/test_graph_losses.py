@@ -99,6 +99,16 @@ class HungarianMatcherTests(unittest.TestCase):
 
 
 class GraphCriterionTests(unittest.TestCase):
+    def test_rejects_ground_truth_larger_than_object_query_capacity(self):
+        config = _config()
+        criterion, _ = self._criterion(config)
+        tokens, predictions, targets = _batch()
+        targets["nodes"] = [torch.zeros((5, 3))]
+        targets["edges"] = [torch.empty((0, 2), dtype=torch.long)]
+
+        with self.assertRaisesRegex(ValueError, "exceeds decoder object-query capacity"):
+            criterion(tokens, predictions, targets)
+
     def test_ratio_upsampling_backward_avoids_zero_repeat(self):
         # This needs one extra positive, fewer than the two-item source pool.
         # PyTorch 1.5 crashes in RepeatBackward if implemented as repeat(0, 1).

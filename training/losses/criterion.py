@@ -462,6 +462,18 @@ class GraphCriterion(nn.Module):
         return metrics
 
     def forward(self, tokens, predictions, targets):
+        overflowing = [
+            (index, int(len(nodes)))
+            for index, nodes in enumerate(targets["nodes"])
+            if len(nodes) > self.object_queries
+        ]
+        if overflowing:
+            raise ValueError(
+                "ground-truth graph exceeds decoder object-query capacity: "
+                f"capacity={self.object_queries}, samples={overflowing}. "
+                "Increase model.decoder.object_queries; silently dropping graph "
+                "nodes would corrupt node and edge supervision."
+            )
         candidate_indices = None
         predicted_structure = None
         if self.matcher.requires_structure:

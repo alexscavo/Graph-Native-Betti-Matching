@@ -92,7 +92,7 @@ def main() -> None:
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--centerline-backend", choices=("legacy", "vedo"), default="legacy")
     parser.add_argument("--rdp-voxels", type=float, default=0.0)
-    parser.add_argument("--radius-fraction", type=float, default=2.0)
+    parser.add_argument("--radius-fraction", type=float, default=1.5)
     parser.add_argument("--spur-length", type=int, default=4)
     parser.add_argument("--max-junction-extent-mm", type=float, default=1.5)
     parser.add_argument("--smooth-iterations", type=int, default=5)

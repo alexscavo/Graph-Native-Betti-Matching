@@ -280,23 +280,34 @@ stride-40 clipping; no crop-first skeletonization was used.
 The first sweep showed that fixed tolerances up to four voxels were not strong
 enough. A second sweep tested fixed 4/5/6-voxel and radius-aware 1/1.5/2×
 tolerances, all with a 95% minimum straight-chord lumen-containment constraint.
-Every policy preserved full-volume β₀/β₁ on 14/14 subjects. Radius-2× yields
-P95 98 edges per nonempty patch, 232/2326 patches above the preferred 70-edge
-level, and 63/2326 above 120 edges. Fixed-5 is marginally smaller (223 and 62),
-but its worst centerline error normalized by local vessel radius is 5.01×,
-versus 1.77× for radius-2×. Radius-2× also has slightly lower P95 geometric
-error (0.634 versus 0.644 mm) and length-weighted shortening (1.89% versus
-1.97%). It is therefore selected as the dataset-agnostic candidate: the small
-token penalty buys substantially safer behavior in thin vessels.
+Every policy preserved full-volume β₀/β₁ on 14/14 subjects. A follow-up geometry
+audit selected radius-1.5× rather than radius-2×: it lowers P95 maximum error
+from 0.634 to 0.603 mm, length-weighted shortening from 1.89% to 1.80%, and the
+worst error normalized by local radius from 1.77× to 1.50×. The cost is about
+1% more full-volume edges; patch P95 changes from 99 to 100.5 nodes and the
+number of patches above 120 changes from 59 to 57. Radius-1.5× is therefore the
+selected global dataset-agnostic policy.
 
-An independent audit of every saved model edge found zero radius-2× edges below
-the configured 95% containment floor (13,393 edges total; mean containment
-99.81%). Budget data and plots are in
+An independent audit found zero radius-1.5× edges below the configured 95%
+containment floor (13,527 edges total; mean containment 99.82%). Budget data and plots are in
 [`evidence/adaptive_tuning/results_stage2_14/`](evidence/adaptive_tuning/results_stage2_14/),
 geometry data and plots in
 [`evidence/adaptive_tuning/geometry_14/`](evidence/adaptive_tuning/geometry_14/),
 and graph-only PNG/interactive HTML views for IXI425 and TopBrain-MR-002 in
-[`evidence/adaptive_tuning/selected_radius2x/`](evidence/adaptive_tuning/selected_radius2x/).
+[`evidence/adaptive_tuning/selected_radius1p5x/`](evidence/adaptive_tuning/selected_radius1p5x/).
+
+Patch overflow is not caused by unavoidable topology. For radius-1.5×, the 57
+patches above 120 contain on average 32.2 topological nodes, 20.6 exact boundary
+nodes, and 91.3 degree-2 geometry nodes; topology plus boundary has a maximum of
+81 over all 2,326 nonempty patches. Without changing or locally simplifying the
+representation, 192 object queries cover every observed patch (maximum 186),
+whereas 160 still misses 14. The selected strategy is therefore a single
+full-volume representation plus a 192-query real-data model configuration,
+subject to confirmation on the complete dataset and a GPU memory benchmark.
+Training now raises an explicit error when a target exceeds query capacity,
+instead of letting Hungarian matching silently omit unmatched ground-truth
+nodes. Evidence is in
+[`evidence/adaptive_tuning/overflow_14/`](evidence/adaptive_tuning/overflow_14/).
 
 The audit also exposed and fixed a serialization defect: six-decimal world
 coordinates in `nodes.csv` could move a junction by approximately 1e-7 voxel

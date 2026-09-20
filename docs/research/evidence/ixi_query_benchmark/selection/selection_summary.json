@@ -1,0 +1,65 @@
+{
+  "all": {
+    "node_max": 177,
+    "node_mean": 46.78393665158371,
+    "node_median": 39.0,
+    "node_p95": 127.0,
+    "over_120": 59,
+    "over_192": 0,
+    "patches": 884
+  },
+  "dataset": "IXI only",
+  "maximum_192_compatible_sample": "sample_000425_0069",
+  "maximum_overflow_sample": "sample_000425_0069",
+  "overflow": {
+    "node_max": 177,
+    "node_mean": 138.72881355932202,
+    "node_median": 136.0,
+    "node_p95": 167.2,
+    "over_120": 59,
+    "over_192": 0,
+    "patches": 59
+  },
+  "overflow_output": "/lustre/fswork/projects/rech/vnc/upz25mj/projects/Graph-Native-Betti-Matching/docs/research/artifacts/ixi_query_benchmark/overflow",
+  "paired": {
+    "node_max": 120,
+    "node_mean": 40.47050754458162,
+    "node_median": 36.0,
+    "node_p95": 104.0,
+    "over_120": 0,
+    "over_192": 0,
+    "patches": 729
+  },
+  "paired_by_split": {
+    "test": {
+      "node_max": 118,
+      "node_mean": 37.953125,
+      "node_median": 31.5,
+      "node_p95": 104.94999999999997,
+      "over_120": 0,
+      "over_192": 0,
+      "patches": 128
+    },
+    "train": {
+      "node_max": 120,
+      "node_mean": 40.7399577167019,
+      "node_median": 37.0,
+      "node_p95": 104.0,
+      "over_120": 0,
+      "over_192": 0,
+      "patches": 473
+    },
+    "val": {
+      "node_max": 120,
+      "node_mean": 41.9921875,
+      "node_median": 38.0,
+      "node_p95": 101.29999999999998,
+      "over_120": 0,
+      "over_192": 0,
+      "patches": 128
+    }
+  },
+  "paired_output": "/lustre/fswork/projects/rech/vnc/upz25mj/projects/Graph-Native-Betti-Matching/docs/research/artifacts/ixi_query_benchmark/paired",
+  "schema_version": 1,
+  "source_patch_root": "/lustre/fswork/projects/rech/vnc/upz25mj/projects/Graph-Native-Betti-Matching/docs/research/artifacts/ixi_query_benchmark/all_patches"
+}

@@ -411,3 +411,9 @@ promising dataset-agnostic rule, not yet a completed transferability claim.
   maximum real IXI patch (177 nodes) completed successfully. Raw steps, GPU
   telemetry, logs, and plots are recorded in
   [`evidence/ixi_query_benchmark/`](evidence/ixi_query_benchmark/).
+- 2026-09-20: Estimated the proposed 50-epoch Plants+TopBrain pretraining and
+  100-epoch TopBrain specialization schedule from the loader/sampler semantics,
+  manifest-derived patch inventory, and measured H100 step cost. The current
+  one-to-four-H100 launcher layout is approximately 9.5 compute hours, with a
+  7.3–13.0-hour planning range before queue time. Assumptions and visualization
+  are in [`evidence/topbrain_training_time_estimate/`](evidence/topbrain_training_time_estimate/).

@@ -81,9 +81,14 @@ def next_batch(iterator, loader):
 
 def distribution(values: list[float]) -> dict[str, float]:
     array = np.asarray(values, dtype=np.float64)
+    ordered = np.sort(array)
+    trim = max(1, int(len(ordered) * 0.05)) if len(ordered) >= 20 else 0
+    trimmed = ordered[trim:-trim] if trim else ordered
     return {
         "mean": float(array.mean()),
         "median": float(np.median(array)),
+        "standard_deviation": float(array.std(ddof=1)) if len(array) > 1 else 0.0,
+        "trimmed_mean_5_percent": float(trimmed.mean()),
         "p05": float(np.percentile(array, 5)),
         "p95": float(np.percentile(array, 95)),
         "minimum": float(array.min()),
@@ -270,6 +275,7 @@ def overflow_smoke(
 def plot(summaries: list[dict], output: Path) -> None:
     import matplotlib.pyplot as plt
 
+    summaries = sorted(summaries, key=lambda item: item["queries"])
     labels = [str(item["queries"]) for item in summaries]
     figure, axes = plt.subplots(1, 3, figsize=(13, 4.5), constrained_layout=True)
     panels = (
@@ -306,12 +312,15 @@ def main() -> int:
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--warmup-steps", type=int, default=5)
     parser.add_argument("--measured-steps", type=int, default=30)
+    parser.add_argument("--query-order", type=int, nargs=2, default=(120, 192))
     parser.add_argument("--seed", type=int, default=364505)
     args = parser.parse_args()
     if not torch.cuda.is_available():
         raise RuntimeError("CUDA is required for this benchmark")
     if args.warmup_steps < 1 or args.measured_steps < 1:
         parser.error("warmup and measured steps must be positive")
+    if sorted(args.query_order) != [120, 192]:
+        parser.error("--query-order must contain 120 and 192 exactly once")
     args.output.mkdir(parents=True, exist_ok=True)
     environment = dict(os.environ)
     # These base-config placeholders are replaced below, but must be resolvable
@@ -320,7 +329,7 @@ def main() -> int:
     environment.setdefault("SYNTHETIC_MRI_DATASET", str(args.dataset.resolve()))
     base = load_config(args.config, environment=environment)
     summaries, steps = [], []
-    for queries in (120, 192):
+    for queries in args.query_order:
         summary, rows = run_case(
             base,
             args.dataset,
@@ -334,11 +343,22 @@ def main() -> int:
         summaries.append(summary)
         steps.extend(rows)
         print(json.dumps(summary, sort_keys=True), flush=True)
-    baseline, candidate = summaries
+    by_queries = {item["queries"]: item for item in summaries}
+    baseline, candidate = by_queries[120], by_queries[192]
     comparison = {
         "time_increase_fraction": (
             candidate["train_step_seconds"]["mean"]
             / baseline["train_step_seconds"]["mean"]
+            - 1.0
+        ),
+        "median_time_increase_fraction": (
+            candidate["train_step_seconds"]["median"]
+            / baseline["train_step_seconds"]["median"]
+            - 1.0
+        ),
+        "trimmed_mean_time_increase_fraction": (
+            candidate["train_step_seconds"]["trimmed_mean_5_percent"]
+            / baseline["train_step_seconds"]["trimmed_mean_5_percent"]
             - 1.0
         ),
         "throughput_change_fraction": (
@@ -363,6 +383,7 @@ def main() -> int:
         "config": str(args.config.resolve()),
         "batch_size": args.batch_size,
         "seed": args.seed,
+        "query_order": args.query_order,
         "cases": summaries,
         "comparison": comparison,
         "overflow_smoke": overflow_smoke(

@@ -35,7 +35,7 @@ submission="$(sbatch \
   --time="${IXI_QUERY_BENCHMARK_WALLTIME:-00:30:00}" \
   --output="$report_dir/slurm-%j.out" \
   --error="$report_dir/slurm-%j.err" \
-  --export=ALL,GNBM_REPO_DIR="$repo_dir",IXI_QUERY_BENCHMARK_DATASET="$dataset",IXI_QUERY_OVERFLOW_DATASET="$overflow_dataset",IXI_QUERY_OVERFLOW_MANIFEST="$overflow_manifest",IXI_QUERY_SELECTION_DIR="$selection_dir",IXI_QUERY_BENCHMARK_REPORT_DIR="$report_dir" \
+  --export=ALL,GNBM_REPO_DIR="$repo_dir",IXI_QUERY_BENCHMARK_DATASET="$dataset",IXI_QUERY_OVERFLOW_DATASET="$overflow_dataset",IXI_QUERY_OVERFLOW_MANIFEST="$overflow_manifest",IXI_QUERY_SELECTION_DIR="$selection_dir",IXI_QUERY_BENCHMARK_REPORT_DIR="$report_dir",IXI_QUERY_MEASURED_STEPS=100,IXI_QUERY_FIRST=192,IXI_QUERY_SECOND=120 \
   "$repo_dir/cluster/jean_zay/ixi_query_benchmark.slurm")"
 
 job_id="${submission%%;*}"
@@ -48,6 +48,8 @@ job_id="${submission%%;*}"
   echo "gpu_type=H100"
   echo "cpus=8"
   echo "dataset=IXI only"
+  echo "measured_steps=100"
+  echo "query_order=192 120"
 } > "$report_dir/submission.txt"
 
 echo "Submitted job $job_id"

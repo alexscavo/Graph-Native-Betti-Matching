@@ -21,6 +21,11 @@ overflow_dataset="${IXI_QUERY_OVERFLOW_DATASET:?}"
 overflow_manifest="${IXI_QUERY_OVERFLOW_MANIFEST:?}"
 report_dir="${IXI_QUERY_BENCHMARK_REPORT_DIR:?}"
 selection_dir="${IXI_QUERY_SELECTION_DIR:?}"
+measured_steps="${IXI_QUERY_MEASURED_STEPS:-100}"
+query_order_arguments=(
+  "${IXI_QUERY_FIRST:-192}"
+  "${IXI_QUERY_SECOND:-120}"
+)
 mkdir -p "$report_dir/results"
 
 {
@@ -34,7 +39,8 @@ mkdir -p "$report_dir/results"
   echo "config=configs/finetune_synthetic_mri.yaml"
   echo "batch_size=8"
   echo "warmup_steps=5"
-  echo "measured_steps=30"
+  echo "measured_steps=$measured_steps"
+  echo "query_order=${query_order_arguments[*]}"
   echo "cuda_visible_devices=${CUDA_VISIBLE_DEVICES:-}"
   echo "slurm_cpus_per_task=${SLURM_CPUS_PER_TASK:-}"
   "$GNBM_VENV/bin/python" -c 'import torch; print("torch=" + torch.__version__); print("cuda=" + str(torch.version.cuda)); print("cudnn=" + str(torch.backends.cudnn.version()))'
@@ -74,7 +80,8 @@ set +e
   --batch-size 8 \
   --workers 4 \
   --warmup-steps 5 \
-  --measured-steps 30 \
+  --measured-steps "$measured_steps" \
+  --query-order "${query_order_arguments[@]}" \
   > "$report_dir/benchmark.log" 2> "$report_dir/time-and-errors.log"
 exit_code=$?
 set -e

@@ -25,12 +25,17 @@ committed.
 
 ## What is measured
 
-Each case performs five warm-up steps and 30 measured full training steps at
+Each case performs five warm-up steps and 100 measured full training steps at
 batch size eight on one H100. A step includes forward inference, Hungarian
 matching, all enabled graph losses, backward propagation, AdamW, and the
 learning-rate scheduler. The report records step-time distributions,
 throughput, peak allocated/reserved GPU memory, parameter counts, target graph
 sizes, losses, whole-job resource usage, and one-second GPU telemetry.
+
+The definitive run executes 192 before 120 to countercheck an initial 30-step
+run that used the opposite order. Reports include the mean, median, 5% trimmed
+mean, P05/P95, and standard deviation so isolated scheduler or I/O stalls do
+not determine the conclusion.
 
 The comparison changes only `model.decoder.object_queries`. Topological losses
 and augmentations are disabled identically in both cases, and no Plants or

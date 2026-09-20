@@ -138,6 +138,7 @@ def run_case(
         )
     torch.cuda.synchronize(device)
     torch.cuda.reset_peak_memory_stats(device)
+    baseline_allocated_gib = torch.cuda.memory_allocated(device) / 1024**3
 
     rows = []
     for step in range(measured_steps):
@@ -162,6 +163,8 @@ def run_case(
         )
         torch.cuda.synchronize(device)
         step_seconds = time.perf_counter() - started
+        loss_total = float(losses["total"].detach().cpu())
+        del losses
         rows.append({
             "queries": queries,
             "step": step + 1,
@@ -172,7 +175,7 @@ def run_case(
             "maximum_target_nodes": max(node_counts),
             "mean_target_nodes": statistics.fmean(node_counts),
             "maximum_target_edges": max(edge_counts),
-            "loss_total": float(losses["total"].detach().cpu()),
+            "loss_total": loss_total,
         })
 
     summary = {
@@ -188,10 +191,14 @@ def run_case(
         "data_wait_seconds": distribution([row["data_wait_seconds"] for row in rows]),
         "maximum_target_nodes": max(row["maximum_target_nodes"] for row in rows),
         "maximum_target_edges": max(row["maximum_target_edges"] for row in rows),
+        "baseline_allocated_gib": baseline_allocated_gib,
         "peak_allocated_gib": torch.cuda.max_memory_allocated(device) / 1024**3,
         "peak_reserved_gib": torch.cuda.max_memory_reserved(device) / 1024**3,
     }
-    del iterator, train_loader, scheduler, optimizer, criterion, model
+    summary["incremental_peak_allocated_gib"] = (
+        summary["peak_allocated_gib"] - summary["baseline_allocated_gib"]
+    )
+    del batch, iterator, train_loader, scheduler, optimizer, criterion, model
     gc.collect()
     torch.cuda.empty_cache()
     torch.cuda.synchronize(device)
@@ -371,6 +378,15 @@ def main() -> int:
         ),
         "peak_allocated_increase_fraction": (
             candidate["peak_allocated_gib"] / baseline["peak_allocated_gib"] - 1.0
+        ),
+        "incremental_peak_allocated_increase_gib": (
+            candidate["incremental_peak_allocated_gib"]
+            - baseline["incremental_peak_allocated_gib"]
+        ),
+        "incremental_peak_allocated_increase_fraction": (
+            candidate["incremental_peak_allocated_gib"]
+            / baseline["incremental_peak_allocated_gib"]
+            - 1.0
         ),
         "parameter_increase": candidate["parameters"] - baseline["parameters"],
         "parameter_increase_fraction": (

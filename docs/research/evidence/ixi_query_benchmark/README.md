@@ -5,6 +5,8 @@ RelationFormer decoder from 120 to 192 object queries. It uses only real IXI
 MRA data and the selected full-volume graph policy: constrained-optimal
 simplification at 0.75 times local radius and 95% minimum lumen containment.
 
+The completed outcome and interpretation are in [`RESULTS.md`](RESULTS.md).
+
 ## Data protocol
 
 Seven IXI subjects are split by patient into train, validation, and test. Their
@@ -19,7 +21,8 @@ same shuffled training batches and seed are used for the 120- and 192-query
 cases. A separate overflow dataset contains every patch above 120 nodes; its
 largest patch is exercised with a complete 192-query training step.
 
-Selection evidence is under [`selection/`](selection/). Generated NIfTI/VTP
+Selection evidence is under [`selection/`](selection/), and stable benchmark
+outputs are under [`final/`](final/). Generated NIfTI/VTP
 patches live under `docs/research/artifacts/ixi_query_benchmark/` and are not
 committed.
 

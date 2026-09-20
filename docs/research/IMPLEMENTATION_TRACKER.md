@@ -15,9 +15,9 @@ screenshot under `evidence/<task-id>/` so results can be independently reviewed.
 ## Current position
 
 - Current phase: Phase 2 — representation-quality metrics and real-data policy selection.
-- Next task: measure the real IXI training-time and GPU-memory increase from 120
-  to 192 object queries, then finish morphology metrics and the ordinary-volume
-  policy audit. Keep the 72-million-voxel `topcow_ct_017` outlier deferred.
+- Next task: finish morphology metrics and the ordinary-volume policy audit,
+  including confirmation that 192 queries cover the full distribution. Keep
+  the 72-million-voxel `topcow_ct_017` outlier deferred.
 - Training changes: prohibited until the representation study is complete.
 
 ## Ordered task list
@@ -33,7 +33,7 @@ screenshot under `evidence/<task-id>/` so results can be independently reviewed.
 | T07 | Implement degree-2 contraction, physical anchor matching, and Branch F1 | 3 | not started |
 | T08 | Validate metrics on the prescribed handcrafted failure cases | 4 | not started |
 | T09 | Generate/smoke-test IXI patches and retrain with optimization unchanged | 5 | not started |
-| T10 | Benchmark 120 versus 192 object queries on paired real IXI patches | 5 | in progress |
+| T10 | Benchmark 120 versus 192 object queries on paired real IXI patches | 5 | complete |
 
 ## Decision log
 
@@ -404,4 +404,10 @@ promising dataset-agnostic rule, not yet a completed transferability claim.
   patient-split real volumes yielded 884 64-cubed patches; 59 exceed 120 nodes,
   none exceeds 192, and the maximum is 177. Added a paired full-training-step
   benchmark, overflow smoke test, selection tables, and visualization under
+  [`evidence/ixi_query_benchmark/`](evidence/ixi_query_benchmark/).
+- 2026-09-20: Completed T10 on one H100 with 100 full training steps per case.
+  Moving from 120 to 192 queries increased mean step time by 2.02%, the 5%-
+  trimmed mean by 1.53%, and absolute peak allocation by 0.101 GiB (3.33%). The
+  maximum real IXI patch (177 nodes) completed successfully. Raw steps, GPU
+  telemetry, logs, and plots are recorded in
   [`evidence/ixi_query_benchmark/`](evidence/ixi_query_benchmark/).

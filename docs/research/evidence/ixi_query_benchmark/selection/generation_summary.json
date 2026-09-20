@@ -1,0 +1,50 @@
+{
+  "complete": true,
+  "completed_at": "2026-09-20T00:56:12.607193+00:00",
+  "completed_patients": 7,
+  "dataset_statistics": {
+    "all": {
+      "edge_count_delta": 43,
+      "foreground_fraction": 0.007533828597262974,
+      "graph_crop_changed_fraction": 0.8642533936651584,
+      "graph_crop_changed_patches": 764,
+      "image_mean": 0.2709698558851394,
+      "node_count_delta": 87,
+      "patches": 884,
+      "tangent_contact_count": 3
+    },
+    "test": {
+      "edge_count_delta": 15,
+      "foreground_fraction": 0.006418131980575433,
+      "graph_crop_changed_fraction": 0.8529411764705882,
+      "graph_crop_changed_patches": 203,
+      "image_mean": 0.2338570071063435,
+      "node_count_delta": 30,
+      "patches": 238,
+      "tangent_contact_count": 0
+    },
+    "train": {
+      "edge_count_delta": 24,
+      "foreground_fraction": 0.008004554175576674,
+      "graph_crop_changed_fraction": 0.8735177865612648,
+      "graph_crop_changed_patches": 442,
+      "image_mean": 0.26588449243680673,
+      "node_count_delta": 49,
+      "patches": 506,
+      "tangent_contact_count": 3
+    },
+    "val": {
+      "edge_count_delta": 4,
+      "foreground_fraction": 0.007729176112583705,
+      "graph_crop_changed_fraction": 0.85,
+      "graph_crop_changed_patches": 119,
+      "image_mean": 0.35244165527235183,
+      "node_count_delta": 8,
+      "patches": 140,
+      "tangent_contact_count": 0
+    }
+  },
+  "expected_patients": 7,
+  "fingerprint": "5cd595f9e1c643e007d1e8206d4d526be5e10996d7f4209b89303a2aa75acba6",
+  "patches_indexed": 884
+}

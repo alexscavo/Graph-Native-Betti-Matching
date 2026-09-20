@@ -65,7 +65,7 @@ trap cleanup_telemetry EXIT
 
 started_seconds=$(date +%s)
 set +e
-/usr/bin/time -v "$GNBM_VENV/bin/python" -u scripts/benchmark_ixi_object_queries.py \
+/usr/bin/time -v "$GNBM_VENV/bin/python" -u -m scripts.benchmark_ixi_object_queries \
   --config configs/finetune_synthetic_mri.yaml \
   --dataset "$dataset" \
   --overflow-dataset "$overflow_dataset" \

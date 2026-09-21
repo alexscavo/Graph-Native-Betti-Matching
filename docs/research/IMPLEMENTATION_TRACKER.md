@@ -14,11 +14,11 @@ screenshot under `evidence/<task-id>/` so results can be independently reviewed.
 
 ## Current position
 
-- Current phase: Phase 2 — representation-quality metrics and real-data policy selection.
-- Next task: finish morphology metrics and the ordinary-volume policy audit,
-  including confirmation that 192 queries cover the full distribution. Keep
-  the 72-million-voxel `topcow_ct_017` outlier deferred.
-- Training changes: prohibited until the representation study is complete.
+- Current phase: Phase 2 — full-dataset production extraction and policy audit.
+- Next task: inspect the 35 IXI patches above 192 nodes and evaluate a uniform
+  query capacity that covers the complete distribution without re-simplifying
+  individual patches; finish the remaining representation metrics. Dataset
+  relocation is complete; training configuration remains unchanged.
 
 ## Ordered task list
 
@@ -32,7 +32,7 @@ screenshot under `evidence/<task-id>/` so results can be independently reviewed.
 | T06 | Run the rate-distortion study across sites and acquisition resolutions | 2 | in progress |
 | T07 | Implement degree-2 contraction, physical anchor matching, and Branch F1 | 3 | not started |
 | T08 | Validate metrics on the prescribed handcrafted failure cases | 4 | not started |
-| T09 | Generate/smoke-test IXI patches and retrain with optimization unchanged | 5 | not started |
+| T09 | Generate/smoke-test IXI patches and retrain with optimization unchanged | 5 | in progress |
 | T10 | Benchmark 120 versus 192 object queries on paired real IXI patches | 5 | complete |
 
 ## Decision log
@@ -98,14 +98,41 @@ screenshot under `evidence/<task-id>/` so results can be independently reviewed.
 ### D06 — Handle graph-token overflow with uniform capacity
 
 - Date: 2026-09-19
-- Status: provisional pending the ordinary-volume inventory audit
+- Status: 192-query limit rejected for full IXI on 2026-09-21; uniform-capacity
+  principle retained pending a new capacity measurement
 - Decision: retain the single global graph representation and use 192 object
-  queries for the real-data experiment. The data pipeline and loss must fail
-  explicitly when a target exceeds the configured capacity.
+  queries for the initial seven-volume real-data experiment, but do not use
+  192 for the complete IXI dataset without resolving its 35 overflow cases.
+  The data pipeline and loss must fail explicitly when a target exceeds the
+  configured capacity.
 - Reason: 45 of 2,326 nonempty 64³ patches exceed 120 nodes under D05, but none
   exceeds 192. Topological plus exact-boundary nodes have a maximum of 81;
   geometry nodes explain every observed overflow. Patch-specific simplification
   would make the target representation depend on crop placement.
+- Full-data result: 35/50,613 patches exceed 192 nodes, all from IXI MRA;
+  maximum 239. The 192-query setting is sufficient for all 28,611 TopBrain
+  patches (maximum 133) but not for all 22,002 IXI patches. These overflow
+  patches are preserved in the dataset and must fail explicitly if fed into a
+  192-query model. Measure a uniform 240/256-query alternative or an explicit
+  overflow policy before full-IXI training; do not silently discard targets.
+
+### D07 — Direct dataset output and explicit patch eligibility
+
+- Date: 2026-09-21
+- Status: implemented; training policy pending representation study
+- Decision: default future production full-volume extraction and patch
+  generation to the corresponding IXI/TopBrain dataset folders, with distinct
+  `vascular_graphs/optimal_radius_0p75x_c095/` and
+  `vascular_patches/optimal_radius_0p75x_c095/` outputs. Keep the complete
+  deterministic 64³ grid for reproducibility and inspectable negative examples.
+  The MRI loader can opt into `patch_selection: graph_positive` using the
+  per-dataset `patch_index.csv`; this excludes masks without foreground and
+  masks without both graph nodes and edges **before** applying a sample cap.
+  The default remains `all`; no training configuration has been changed.
+- Reason: discarding source data at extraction time prevents studying
+  foreground-negative examples, while including them unintentionally in
+  graph-learning runs distorts the target distribution. Graph-free but
+  mask-positive border slabs require separate QC, not silent relabeling.
 
 ## Evidence log
 
@@ -382,6 +409,107 @@ approximately neutral: mean nodes remain 16.1, P95 changes from 45 to 46, and
 patches above 70 change from 4 to 7, with a maximum of 115. The policy is thus a
 promising dataset-agnostic rule, not yet a completed transferability claim.
 
+## Full-dataset production extraction (2026-09-20)
+
+The selected D05 policy is now being applied to the complete deterministic
+inventory: 170 IXI MRA, 25 TopBrain MR, 18 TopBrain CT training, and 7 labeled
+TopBrain CT test volumes. CPU array job `2192366` has one volume per task, one
+CPU per task, a 20-minute limit, and at most 12 concurrent tasks. Extraction is
+resumable and each result is accepted only when its configuration fingerprint
+and all graph files match constrained-optimal simplification at radius-0.75x
+with 95% minimum chord containment.
+
+Dependent job `2192776` will run only after all 220 extraction tasks succeed.
+It validates and stages the selected full-volume `adaptive` products, then
+crops 64-cubed patches at maximum stride 40 with exact graph/patch-face
+intersections and no patch-level re-simplification. The seven official
+TopBrain CT test cases remain in test; the other subjects are deterministically
+stratified, yielding 154/33/33 train/validation/test patients overall.
+
+Generated patches are written to
+`/lustre/fsn1/projects/rech/vnc/upz25mj/datasets/VesselGraph_patches_optimal_0p75_c095`.
+The post-run audit will validate every full graph and patch graph and write JSON,
+CSV, overflow tables, and `production_graph_and_patch_qc.png` below
+[`evidence/full_dataset_production/`](evidence/full_dataset_production/).
+
+### Production run and dataset placement
+
+All 220 tasks of array `2192366` completed successfully, including
+`topcow_ct_017` (1 minute 35 seconds); all 220 selected-policy full-volume
+markers were validated by the staging job; final dataset placement will
+checksum all nine graph files per subject before removing any originals.
+An independent inventory verified all nine files on all 220 subjects and
+identical full-volume β₀/β₁ across junction-only, adaptive, and dense graphs
+for every subject. This confirms representation-internal topology preservation,
+but does not establish that every segmentation has correct vascular topology.
+The first patch run `2192776` completed 218 patients, but failed on IXI371:
+the legacy normalizer first casts floating-point MRA values to integers, which
+made its median/MAD threshold zero although the image contains real signal.
+The fallback uses the finite floating-point 99.5th percentile **only** when
+the legacy threshold is invalid, preserving the 218 already completed patch
+normalizations. The first resume `14070` additionally exposed a `2.94e-7`
+image/label affine rounding difference on TopBrain MR-002; patch geometry now
+uses the same `1e-4` absolute tolerance as full-volume extraction. Both
+failures were caught by the source/patch validation, not silently accepted.
+Focused generator, split, and relocation tests pass (9/9).
+
+The second resumable patch job `14146` was canceled while pending to avoid
+unnecessary queue delay. The sole remaining TopBrain MR patient was completed
+locally with one CPU, and the independent audit verified all 220 full graphs
+and all 50,613 patch VTP files. Relocation then copies and checksums
+**all three** (`junction_only`, `adaptive`, `dense`) full-volume representations
+into `IXI/vascular_graphs/optimal_radius_0p75x_c095/` and
+`TopBrain_Data_Release_Batches1n2_081425/vascular_graphs/optimal_radius_0p75x_c095/`.
+It moves corresponding exact-boundary patch triplets to each dataset's
+`vascular_patches/optimal_radius_0p75x_c095/` folder with dataset-specific
+indices, original subject provenance, and the preserved patient split. Only
+after every relocated file has been checked are the redundant production
+outputs/staging entries removed from `docs/research/artifacts/` and the mixed
+temporary patch directory. Research comparisons and their real-data visual
+evidence remain available in `docs/research/evidence/`.
+
+The dependent relocation job `14170` was canceled while pending to avoid
+waiting in a compute queue for file placement. The verified and resumable
+relocation instead runs locally after patch QC; its one-hour Slurm request was
+not an estimate of actual copy time.
+
+The complete inventory found 50,613 exact-boundary 64³ patches: node median 7,
+P95 100, P99 142, maximum 239. There are 1,271 above 120 nodes and **35 above
+192** (all IXI); TopBrain's 28,611 patches have maximum 133. Edge P95 is 101,
+maximum 261. This overturns the seven-volume IXI inference that 192 queries
+cover *all* cases while confirming that 192 suffices for TopBrain. Machine-
+readable inventory, per-modality/split breakdown, every overflowing sample,
+and a full-tail distribution plot are in
+[`evidence/full_dataset_production/`](evidence/full_dataset_production/).
+
+Two additional production volumes outside the original 14-volume selection
+subset have graph-only full-volume screenshots and interactive HTML, colored by
+termination, degree-2 subdivision, and junction: IXI033 (1,198 nodes / 1,305
+edges) and TopBrain CT-010 (287 nodes / 290 edges). These are qualitative QC,
+not proof that segmentation-derived false connections are absent. Views are in
+[`evidence/full_dataset_production/sample_views/`](evidence/full_dataset_production/sample_views/).
+
+### E11 — Exhaustive patch-grid eligibility on the relocated real datasets
+
+The patch generator chooses per-axis endpoints with `ceil((length-64)/40)`
+intervals and rounded evenly spaced starts, then takes the Cartesian product;
+it does **not** choose random positions or preselect foreground. The source
+volumes are graphed first and then cropped; 64³ crops overlap by at least 24
+voxels per axis where there are consecutive starts. An independent scan of the
+relocated `patch_index.csv` files identified 30,778 graph-positive patches,
+18,903 masks with zero foreground, and 932 with foreground but no graph edge
+(928 without nodes, four more with nodes but no edges). All 932 corresponding
+real segmentation crops were reopened and checked against the stored foreground
+counts. In 922/932, no segmented foreground lies ≥8 voxels from all patch
+faces; the other ten need closer review. This *suggests* a boundary-cropping
+explanation for many cases, not proof that the ten or any other case has a
+correct full-volume graph. Per-dataset counts, individual exception rows with
+bounding boxes/depth, and the rendered comparison are in
+[`evidence/full_dataset_production/patch_eligibility/`](evidence/full_dataset_production/patch_eligibility/).
+The same folder includes real segmentation projections of a two-voxel
+boundary remnant and a 3,550-voxel graph-free slab, to help decide whether
+mask-only negatives deserve their own treatment.
+
 ## Change log
 
 - 2026-09-18: Created the tracker and organized the research documents under
@@ -417,3 +545,11 @@ promising dataset-agnostic rule, not yet a completed transferability claim.
   one-to-four-H100 launcher layout is approximately 9.5 compute hours, with a
   7.3–13.0-hour planning range before queue time. Assumptions and visualization
   are in [`evidence/topbrain_training_time_estimate/`](evidence/topbrain_training_time_estimate/).
+- 2026-09-20: Submitted selected-policy extraction for all 220 IXI/TopBrain
+  volumes as job `2192366` and dependent exact-boundary patch generation plus
+  production QC as job `2192776`.
+- 2026-09-21: Finished dataset-folder relocation locally and completed the
+  independent 50,613-patch foreground/graph audit. Future Slurm wrappers
+  default to dataset-local production output; the loader exposes an optional
+  index-validated graph-positive patch selection, with no training config
+  altered. No relocation or additional extraction job was submitted.

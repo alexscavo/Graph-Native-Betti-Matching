@@ -336,6 +336,31 @@ def write_nifti(path: Path, array: np.ndarray) -> None:
     os.replace(temporary, path)
 
 
+def normalize_vessel_image(raw: np.ndarray) -> tuple[np.ndarray, float]:
+    """Retain legacy normalization except when float-to-int truncation zeros MAD.
+
+    The improved IXI MRA data contains a mostly sub-unit-valued float volume;
+    converting it to int32 makes the legacy median and MAD both zero despite
+    substantial nonzero image signal. Only in that degenerate case use a
+    positive finite float percentile, retaining the normal legacy path for all
+    other subjects (and all previously completed patches).
+    """
+
+    try:
+        return normalize_like_legacy(raw)
+    except ValueError as error:
+        if "Legacy normalization threshold is invalid" not in str(error):
+            raise
+    finite = np.asarray(raw, dtype=np.float32)
+    if not np.isfinite(finite).all():
+        raise ValueError("Cannot normalize an image containing non-finite intensities")
+    threshold = float(np.percentile(finite, 99.5))
+    if not np.isfinite(threshold) or threshold <= 0.0:
+        raise ValueError(f"Float normalization threshold is invalid: {threshold}")
+    print(f"legacy intensity threshold unavailable; using float P99.5={threshold:.6g}", flush=True)
+    return np.minimum(finite, threshold) / threshold, threshold
+
+
 def hardlink_patch(source: Path, destination: Path) -> None:
     """Materialize an unchanged patch without duplicating its file payload."""
 
@@ -476,14 +501,14 @@ def _generate_patient(task: Mapping[str, object]) -> dict[str, object]:
             f"Shape mismatch for {patient_id}: "
             f"raw={raw_image.shape}, seg={segmentation_image.shape}"
         )
-    if not np.allclose(raw_image.affine, segmentation_image.affine):
+    if not np.allclose(raw_image.affine, segmentation_image.affine, atol=1e-4):
         raise ValueError(f"Raw/segmentation affine mismatch for {patient_id}")
 
     reuse_rows = task.get("reuse_rows")
     if reuse_rows is None:
         raw = np.asanyarray(raw_image.dataobj)
         segmentation = np.asarray(segmentation_image.dataobj)
-        normalized, threshold = normalize_like_legacy(raw)
+        normalized, threshold = normalize_vessel_image(raw)
     else:
         segmentation = None
         normalized = None
@@ -664,7 +689,8 @@ def combine_patient_manifests(output: Path) -> tuple[int, int, dict[str, dict[st
 
 
 def validate_split_map(
-    split_map: Mapping[str, str], sources: Mapping[str, tuple[Path, Path, Path]]
+    split_map: Mapping[str, str], sources: Mapping[str, tuple[Path, Path, Path]],
+    *, require_exact: bool = True,
 ) -> None:
     if set(split_map) != set(sources):
         raise ValueError(
@@ -674,7 +700,7 @@ def validate_split_map(
         )
     counts = Counter(split_map.values())
     expected = split_sizes(len(sources))
-    if dict(counts) != expected:
+    if require_exact and dict(counts) != expected:
         raise ValueError(f"Unexpected split sizes: received={counts}, expected={expected}")
 
 
@@ -697,6 +723,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--split-trials", type=int, default=20000)
     parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--allow-existing-split-proportions", action="store_true",
+                        help="retain validated patient IDs/splits from an existing per-dataset inventory")
     parser.add_argument("--plan-only", action="store_true")
     parser.add_argument("--patient-id", action="append", default=[])
     parser.add_argument("--max-patients", type=int)
@@ -740,7 +768,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 f"Split already exists: {split_output}. Use --resume to reuse it."
             )
         split_map = read_splits(split_output)
-        validate_split_map(split_map, sources)
+        validate_split_map(split_map, sources, require_exact=not args.allow_existing_split_proportions)
     else:
         features = collect_patient_features(sources)
         split_map, split_score = balanced_patient_split(

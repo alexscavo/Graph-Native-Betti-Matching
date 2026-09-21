@@ -172,6 +172,7 @@ def _dataset_for_split(
                 settings.get("sample_cap_selection", "first")
             ),
             sample_cap_seed=int(settings.get("sample_cap_seed", 0)),
+            patch_selection=str(settings.get("patch_selection", "all")),
             **common,
         )
     raise ValueError(f"Unsupported dataset: {name}")

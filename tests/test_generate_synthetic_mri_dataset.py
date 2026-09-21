@@ -17,6 +17,7 @@ from scripts.generate_synthetic_mri_dataset import (
     endpoint_axis_starts,
     endpoint_grid_positions,
     main,
+    normalize_vessel_image,
     split_sizes,
 )
 
@@ -64,6 +65,24 @@ class BalancedSplitTests(unittest.TestCase):
             split_sizes(136),
         )
         self.assertEqual(set(first), {str(index) for index in range(1, 137)})
+
+
+class VesselNormalizationTests(unittest.TestCase):
+    def test_float_intensity_fallback_preserves_subunit_signal(self) -> None:
+        raw = np.asarray([0.0] * 100 + [0.25] * 50 + [0.75] * 30 + [1.4] * 20)
+        normalized, threshold = normalize_vessel_image(raw)
+        self.assertGreater(threshold, 0)
+        self.assertGreater(float(normalized[100]), 0)
+        self.assertAlmostEqual(float(normalized[-1]), 1.0)
+
+    def test_normal_non_degenerate_image_keeps_legacy_normalization(self) -> None:
+        from scripts.audit_synthetic_mri_grid import normalize_like_legacy
+
+        raw = np.arange(64, dtype=np.float32).reshape(4, 4, 4)
+        expected, threshold = normalize_like_legacy(raw)
+        actual, new_threshold = normalize_vessel_image(raw)
+        np.testing.assert_array_equal(actual, expected)
+        self.assertEqual(new_threshold, threshold)
 
 
 class GeneratorIntegrationTests(unittest.TestCase):

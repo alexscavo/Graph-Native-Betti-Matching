@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import os
 from pathlib import Path
 from typing import List
@@ -28,21 +29,47 @@ def resolve_split_root(root: Path, split: str, *, allow_direct: bool = True) -> 
 
 
 def discover_synthetic_mri(
-    root: Path, split: str, *, allow_direct: bool = True
+    root: Path, split: str, *, allow_direct: bool = True,
+    patch_selection: str = "all",
 ) -> List[SamplePaths]:
+    if patch_selection not in {"all", "foreground", "graph_positive"}:
+        raise ValueError(f"Unsupported patch_selection: {patch_selection}")
     leaf = resolve_split_root(root, split, allow_direct=allow_direct)
+    eligible = None
+    if patch_selection != "all":
+        index_path = leaf.parent / "patch_index.csv"
+        if not index_path.is_file():
+            raise FileNotFoundError(f"Patch selection requires {index_path}")
+        with index_path.open(newline="") as stream:
+            reader = csv.DictReader(stream)
+            required = {"sample_id", "split", "foreground_voxels", "node_count", "edge_count"}
+            if not required.issubset(reader.fieldnames or ()):
+                raise ValueError(f"Missing patch selection fields in {index_path}")
+            selected_rows = [row for row in reader if row["split"] == split.strip().lower()]
+        if len({row["sample_id"] for row in selected_rows}) != len(selected_rows):
+            raise ValueError(f"Duplicate sample IDs in {index_path}")
+        eligible = {
+            row["sample_id"] for row in selected_rows
+            if int(row["foreground_voxels"]) > 0
+            and (patch_selection == "foreground" or
+                 (int(row["node_count"]) > 0 and int(row["edge_count"]) > 0))
+        }
     images = sorted((leaf / "raw").glob("*_data.nii*"))
     records = []
     for image in images:
         suffix = "_data.nii.gz" if image.name.endswith("_data.nii.gz") else "_data.nii"
         sample_id = image.name[: -len(suffix)]
+        if eligible is not None and sample_id not in eligible:
+            continue
         extension = ".nii.gz" if suffix.endswith(".nii.gz") else ".nii"
         segmentation = leaf / "seg" / f"{sample_id}_seg{extension}"
         graph = leaf / "vtp" / f"{sample_id}_graph.vtp"
         _require_pair(image, segmentation, graph)
         records.append(SamplePaths(image, segmentation, graph, sample_id))
     if not records:
-        raise FileNotFoundError(f"No *_data.nii or *_data.nii.gz files in {leaf / 'raw'}")
+        raise FileNotFoundError(f"No matching MRI patches in {leaf / 'raw'} (selection={patch_selection})")
+    if eligible is not None and {record.sample_id for record in records} != eligible:
+        raise ValueError(f"Patch index references missing image/seg/graph in {leaf}")
     return records
 
 

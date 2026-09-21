@@ -304,6 +304,10 @@ def validate_config(config: Mapping[str, Any]) -> None:
                     f"{location}.coordinate_order_on_disk must be [y, x]"
                 )
         elif name == "synthetic_mri":
+            if dataset.get("patch_selection", "all") not in {"all", "foreground", "graph_positive"}:
+                raise ConfigError(
+                    f"{location}.patch_selection must be all, foreground or graph_positive"
+                )
             if dataset.get("coordinate_space_on_disk") not in {"normalized", "voxel"}:
                 raise ConfigError(
                     f"{location}.coordinate_space_on_disk must be normalized or voxel"

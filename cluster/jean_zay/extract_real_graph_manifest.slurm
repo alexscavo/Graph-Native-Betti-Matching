@@ -17,13 +17,18 @@ set -euo pipefail
 : "${REAL_GRAPH_REPO:?set REAL_GRAPH_REPO}"
 : "${REAL_GRAPH_PYTHON:?set REAL_GRAPH_PYTHON}"
 : "${REAL_GRAPH_MANIFEST:?set REAL_GRAPH_MANIFEST}"
-: "${REAL_GRAPH_OUTPUT:?set REAL_GRAPH_OUTPUT}"
+: "${REAL_GRAPH_DATASET_OUTPUT_ROOT:?set REAL_GRAPH_DATASET_OUTPUT_ROOT}"
 : "${REAL_GRAPH_NUM_SHARDS:=220}"
 export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
 export MPLCONFIGDIR="${MPLCONFIGDIR:-${TMPDIR:-/tmp}/matplotlib-${SLURM_JOB_ID}}"
 mkdir -p "$MPLCONFIGDIR"
 cd "$REAL_GRAPH_REPO"
+if [ -n "${REAL_GRAPH_OUTPUT:-}" ]; then
+  destination=(--output "$REAL_GRAPH_OUTPUT")
+else
+  destination=(--dataset-root "$REAL_GRAPH_DATASET_OUTPUT_ROOT")
+fi
 srun "$REAL_GRAPH_PYTHON" -u scripts/extract_real_graph_manifest.py \
-  --manifest "$REAL_GRAPH_MANIFEST" --output "$REAL_GRAPH_OUTPUT" \
+  --manifest "$REAL_GRAPH_MANIFEST" "${destination[@]}" \
   --shard "${SLURM_ARRAY_TASK_ID}" --num-shards "$REAL_GRAPH_NUM_SHARDS" \
   ${REAL_GRAPH_ARGS:-}

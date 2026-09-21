@@ -24,6 +24,11 @@ from scripts.ixi_vessel_graph import build_representation_family, write_source_g
 
 SCHEMA_VERSION = 3
 FILES = ("nodes.csv", "edges.csv", "graph.vvg")
+DATASET_DIRECTORIES = {
+    "ixi": "IXI",
+    "topbrain": "TopBrain_Data_Release_Batches1n2_081425",
+}
+GRAPH_POLICY_DIRECTORY = "optimal_radius_0p75x_c095"
 
 
 def configuration(args) -> dict:
@@ -37,8 +42,20 @@ def configuration(args) -> dict:
     }
 
 
+def graph_destination(row: dict[str, str], args) -> Path:
+    if args.dataset_root is not None:
+        if row["dataset"] not in DATASET_DIRECTORIES:
+            raise ValueError(f"unsupported dataset folder for {row['dataset']!r}")
+        return (
+            args.dataset_root / DATASET_DIRECTORIES[row["dataset"]]
+            / "vascular_graphs" / GRAPH_POLICY_DIRECTORY
+            / row["modality"] / row["split"] / row["subject"]
+        )
+    return args.output / row["dataset"] / row["modality"] / row["split"] / row["subject"]
+
+
 def process(row: dict[str, str], args) -> str:
-    destination = args.output / row["dataset"] / row["modality"] / row["split"] / row["subject"]
+    destination = graph_destination(row, args)
     marker = destination / "complete.json"
     config = configuration(args)
     fingerprint = hashlib.sha256(json.dumps(config, sort_keys=True).encode()).hexdigest()[:16]
@@ -88,7 +105,9 @@ def process(row: dict[str, str], args) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, required=True)
-    parser.add_argument("--output", type=Path, required=True)
+    destination = parser.add_mutually_exclusive_group(required=True)
+    destination.add_argument("--output", type=Path, help="legacy single-root layout")
+    destination.add_argument("--dataset-root", type=Path, help="write directly inside IXI and TopBrain dataset folders")
     parser.add_argument("--shard", type=int, default=int(os.getenv("SLURM_ARRAY_TASK_ID", "0")))
     parser.add_argument("--num-shards", type=int, default=int(os.getenv("REAL_GRAPH_NUM_SHARDS", "1")))
     parser.add_argument("--force", action="store_true")

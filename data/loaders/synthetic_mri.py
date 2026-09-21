@@ -200,11 +200,13 @@ def build_synthetic_mri_dataset(
     coordinate_space: str = "normalized",
     domain_label: int = 1,
     allow_direct_root: bool = True,
+    patch_selection: str = "all",
     augment: Optional[bool] = None,
     **kwargs,
 ) -> SyntheticMRIDataset:
     records = discover_synthetic_mri(
-        Path(root), split, allow_direct=allow_direct_root
+        Path(root), split, allow_direct=allow_direct_root,
+        patch_selection=patch_selection,
     )
     records = select_capped_records(
         records,

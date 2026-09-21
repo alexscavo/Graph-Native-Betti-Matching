@@ -200,6 +200,37 @@ class DiscoveryTests(unittest.TestCase):
             with self.assertRaises(FileNotFoundError):
                 discover_plants(root, "val", allow_direct=False)
 
+    def test_vessel_patch_selection_filters_before_training_cap(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            leaf = self._folders(root)
+            for sample_id in ("sample_0", "sample_1", "sample_2"):
+                (leaf / "raw" / f"{sample_id}_data.nii.gz").touch()
+                (leaf / "seg" / f"{sample_id}_seg.nii.gz").touch()
+                (leaf / "vtp" / f"{sample_id}_graph.vtp").touch()
+            index = root / "patch_index.csv"
+            index.write_text(
+                "sample_id,split,foreground_voxels,node_count,edge_count\n"
+                "sample_0,train,0,0,0\n"
+                "sample_1,train,17,0,0\n"
+                "sample_2,train,21,2,1\n"
+            )
+            self.assertEqual(len(discover_synthetic_mri(root, "train")), 3)
+            self.assertEqual(
+                [record.sample_id for record in discover_synthetic_mri(root, "train", patch_selection="foreground")],
+                ["sample_1", "sample_2"],
+            )
+            selected = build_synthetic_mri_dataset(
+                root, split="train", patch_selection="graph_positive",
+                max_samples=1, augment=False,
+            )
+            self.assertEqual([record.sample_id for record in selected.records], ["sample_2"])
+            with self.assertRaisesRegex(ValueError, "Unsupported patch_selection"):
+                discover_synthetic_mri(root, "train", patch_selection="bad")
+            index.unlink()
+            with self.assertRaisesRegex(FileNotFoundError, "Patch selection requires"):
+                discover_synthetic_mri(root, "train", patch_selection="graph_positive")
+
     def test_seeded_mri_cap_has_stable_random_membership(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

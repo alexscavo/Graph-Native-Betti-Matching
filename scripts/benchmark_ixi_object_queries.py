@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Benchmark 120 versus 192 object queries on identical real IXI patches."""
+"""Benchmark two object-query capacities on identical real IXI patches."""
 
 from __future__ import annotations
 
@@ -211,6 +211,8 @@ def overflow_smoke(
     manifest_path: Path,
     *,
     seed: int,
+    lower_queries: int = 120,
+    upper_queries: int = 192,
 ) -> dict:
     records = discover_synthetic_mri(root, "train", allow_direct=False)
     with manifest_path.open(newline="") as stream:
@@ -220,16 +222,16 @@ def overflow_smoke(
     compatible = [
         record
         for record in records
-        if 120 < node_manifest.get(record.sample_id, -1) <= 192
+        if lower_queries < node_manifest.get(record.sample_id, -1) <= upper_queries
     ]
     if not compatible:
-        raise ValueError("overflow set has no IXI patch with 121..192 graph nodes")
+        raise ValueError(f"overflow set has no IXI patch with {lower_queries + 1}..{upper_queries} graph nodes")
     compatible.sort(
         key=lambda record: (-node_manifest[record.sample_id], record.sample_id)
     )
     selected = compatible[0]
     seed_everything(seed)
-    config = benchmark_config(base, root, 192, 1, 0)
+    config = benchmark_config(base, root, upper_queries, 1, 0)
     dataset = SyntheticMRIDataset(
         [selected],
         image_size=tuple(config["data"]["image_size"]),
@@ -241,7 +243,7 @@ def overflow_smoke(
     batch = next(iter(loader))
     target_nodes = int(len(batch[2][0]))
     target_edges = int(len(batch[3][0]))
-    if target_nodes <= 120:
+    if target_nodes <= lower_queries:
         raise ValueError(f"overflow smoke selected only {target_nodes} nodes")
     device = torch.device("cuda")
     model = build_model(config).to(device)
@@ -267,7 +269,7 @@ def overflow_smoke(
         "sample_id": selected.sample_id,
         "target_nodes": target_nodes,
         "target_edges": target_edges,
-        "queries": 192,
+        "queries": upper_queries,
         "train_step_seconds": time.perf_counter() - started,
         "peak_allocated_gib": torch.cuda.max_memory_allocated(device) / 1024**3,
         "loss_total": float(losses["total"].detach().cpu()),
@@ -303,7 +305,7 @@ def plot(summaries: list[dict], output: Path) -> None:
                 ha="center",
                 va="bottom",
             )
-    figure.suptitle("IXI-only 120 vs 192 object-query training cost")
+    figure.suptitle(f"IXI-only {labels[0]} vs {labels[1]} object-query training cost")
     figure.savefig(output, dpi=180)
     plt.close(figure)
 
@@ -326,8 +328,9 @@ def main() -> int:
         raise RuntimeError("CUDA is required for this benchmark")
     if args.warmup_steps < 1 or args.measured_steps < 1:
         parser.error("warmup and measured steps must be positive")
-    if sorted(args.query_order) != [120, 192]:
-        parser.error("--query-order must contain 120 and 192 exactly once")
+    lower, upper = sorted(args.query_order)
+    if lower < 1 or lower == upper:
+        parser.error("--query-order must contain two distinct positive capacities")
     args.output.mkdir(parents=True, exist_ok=True)
     environment = dict(os.environ)
     # These base-config placeholders are replaced below, but must be resolvable
@@ -351,7 +354,7 @@ def main() -> int:
         steps.extend(rows)
         print(json.dumps(summary, sort_keys=True), flush=True)
     by_queries = {item["queries"]: item for item in summaries}
-    baseline, candidate = by_queries[120], by_queries[192]
+    baseline, candidate = by_queries[lower], by_queries[upper]
     comparison = {
         "time_increase_fraction": (
             candidate["train_step_seconds"]["mean"]
@@ -407,6 +410,8 @@ def main() -> int:
             args.overflow_dataset,
             args.overflow_manifest,
             seed=args.seed,
+            lower_queries=lower,
+            upper_queries=upper,
         ),
     }
     (args.output / "summary.json").write_text(

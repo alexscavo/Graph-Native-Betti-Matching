@@ -558,3 +558,26 @@ mask-only negatives deserve their own treatment.
   adaptive-policy comparisons, the query benchmark final report, and the
   full-dataset production/QC evidence. The current source of production data
   is the dataset-local `vascular_graphs/` and `vascular_patches/` layout.
+- 2026-09-21: Curated **training only** in both dataset-local patch roots.
+  IXI retains 13,736 graph-positive foreground training crops and archives
+  2,092 (1,966 empty mask; 126 foreground without graph); TopBrain retains
+  7,379 and archives 11,124 (10,649 empty mask; 475 foreground without
+  graph). Each rejected raw/seg/VTP triplet is recoverable under
+  `excluded_train/`; `patch_index.csv` still describes the original exhaustive
+  grid and `training_view.json`, `active_train_index.csv`, and
+  `excluded_train_index.csv` document the active view. The original val/test
+  grids were not filtered, so negatives remain represented in evaluation.
+  The existing grid is 64³ with maximum stride 40, giving at least 24/64
+  (37.5%) overlap on each axis. No resampling is needed for 5–10k training
+  patches: TopBrain already supplies 7,379; IXI can take a reproducible 8,000
+  of its 13,736 train patches without changing the volume-level split. The
+  IXI-only training config `configs/finetune_ixi_vessels_q256.yaml` makes the
+  latter choice with 256 uniform object queries, preserving all val/test.
+  See [`evidence/ixi_capacity_192_256/`](evidence/ixi_capacity_192_256/) for
+  the training-count plot and the 192-versus-256 IXI-only capacity experiment.
+- 2026-09-21: Job `22067` completed the IXI-only paired 192/256-query test
+  (60 full steps per capacity, batch eight). At 256 queries mean step time was
+  +7.51% and peak allocated GPU memory +0.085 GiB; a real 239-node IXI crop
+  completed a full 256-query training step. This verifies compute/capacity,
+  not convergence. Exact samples, visualization and timings are in
+  [`evidence/ixi_capacity_192_256/`](evidence/ixi_capacity_192_256/).

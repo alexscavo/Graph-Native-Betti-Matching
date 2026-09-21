@@ -1,0 +1,23 @@
+defaults:
+  - finetune_synthetic_mri.yaml
+
+# One dataset only: point SYNTHETIC_MRI_DATASET at
+# /lustre/fsn1/projects/rech/vnc/upz25mj/datasets/IXI/vascular_patches/optimal_radius_0p75x_c095.
+# The active train directory has graph-positive patches; val/test retain the
+# original exhaustive grid, including foreground-negative patches.
+experiment:
+  name: finetune_ixi_vessels_q256
+
+data:
+  batch_size: 8
+  datasets:
+    synthetic_mri:
+      train_samples: 8000
+      validation_samples: null
+      patch_selection: all
+      sample_cap_selection: seeded_random
+      sample_cap_seed: 364505
+
+model:
+  decoder:
+    object_queries: 256

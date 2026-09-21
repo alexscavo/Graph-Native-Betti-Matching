@@ -735,6 +735,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     root = args.root.resolve()
     output = (args.output_dir or (root / "new_patches")).resolve()
+    if (output / "training_view.json").exists():
+        raise ValueError(
+            f"Cannot regenerate into curated training view {output}: excluded training "
+            "triplets are archived in excluded_train/. Restore the complete grid first "
+            "or choose a new output directory."
+        )
     split_output = (args.split_output or (root / "new_split.csv")).resolve()
     reuse_patch_root = (
         args.reuse_patches_from.resolve() if args.reuse_patches_from else None

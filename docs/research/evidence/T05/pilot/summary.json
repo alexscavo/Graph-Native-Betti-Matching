@@ -1,0 +1,167 @@
+{
+  "subjects": 5,
+  "sample_spacing_mm": 0.5,
+  "sampling_note": "Branch-paired, arc-uniform samples to exact continuous target polylines; endpoints repeated per branch",
+  "strata": {
+    "IXI-Guys": {
+      "junction_only": {
+        "nodes": 265.0,
+        "edges": 316.0,
+        "degree_2": 0.0,
+        "curve_f1_0.5mm": 0.2672446227982259,
+        "curve_acd_mm": 2.444255120558389,
+        "curve_hd95_mm": 11.009261869591295,
+        "length_weighted_absolute_branch_length_error_fraction": 0.30847197361903883,
+        "length_weighted_tortuosity_error": 0.5312418351912567
+      },
+      "adaptive": {
+        "nodes": 1032.0,
+        "edges": 1083.0,
+        "degree_2": 767.0,
+        "curve_f1_0.5mm": 0.8951052216560484,
+        "curve_acd_mm": 0.27585604138138187,
+        "curve_hd95_mm": 0.6117284659847947,
+        "length_weighted_absolute_branch_length_error_fraction": 0.14481469517783346,
+        "length_weighted_tortuosity_error": 0.22361810087133302
+      },
+      "dense": {
+        "nodes": 5905.0,
+        "edges": 5956.0,
+        "degree_2": 5640.0,
+        "curve_f1_0.5mm": 1.0,
+        "curve_acd_mm": 3.56481632990953e-15,
+        "curve_hd95_mm": 1.0940239444411507e-14,
+        "length_weighted_absolute_branch_length_error_fraction": 0.0,
+        "length_weighted_tortuosity_error": 0.0
+      }
+    },
+    "IXI-HH": {
+      "junction_only": {
+        "nodes": 279.0,
+        "edges": 363.0,
+        "degree_2": 0.0,
+        "curve_f1_0.5mm": 0.2553908153138252,
+        "curve_acd_mm": 2.915950051855594,
+        "curve_hd95_mm": 12.254994638280097,
+        "length_weighted_absolute_branch_length_error_fraction": 0.40253327900977304,
+        "length_weighted_tortuosity_error": 1.2327323801657577
+      },
+      "adaptive": {
+        "nodes": 1220.0,
+        "edges": 1304.0,
+        "degree_2": 941.0,
+        "curve_f1_0.5mm": 0.876042268950852,
+        "curve_acd_mm": 0.2902124594911042,
+        "curve_hd95_mm": 0.6483614827088681,
+        "length_weighted_absolute_branch_length_error_fraction": 0.15347584308661502,
+        "length_weighted_tortuosity_error": 0.35411344819809887
+      },
+      "dense": {
+        "nodes": 6797.0,
+        "edges": 6881.0,
+        "degree_2": 6518.0,
+        "curve_f1_0.5mm": 1.0,
+        "curve_acd_mm": 1.968517136492593e-15,
+        "curve_hd95_mm": 4.4480550639232325e-15,
+        "length_weighted_absolute_branch_length_error_fraction": 0.0,
+        "length_weighted_tortuosity_error": 0.0
+      }
+    },
+    "IXI-IOP": {
+      "junction_only": {
+        "nodes": 281.0,
+        "edges": 367.0,
+        "degree_2": 0.0,
+        "curve_f1_0.5mm": 0.2900323626237488,
+        "curve_acd_mm": 2.24767887529308,
+        "curve_hd95_mm": 9.94087383147799,
+        "length_weighted_absolute_branch_length_error_fraction": 0.3444940201097329,
+        "length_weighted_tortuosity_error": 0.6953147176131081
+      },
+      "adaptive": {
+        "nodes": 1047.0,
+        "edges": 1133.0,
+        "degree_2": 766.0,
+        "curve_f1_0.5mm": 0.8670432103707165,
+        "curve_acd_mm": 0.29251103164163317,
+        "curve_hd95_mm": 0.6872176362378983,
+        "length_weighted_absolute_branch_length_error_fraction": 0.16131158691667594,
+        "length_weighted_tortuosity_error": 0.2800841954749865
+      },
+      "dense": {
+        "nodes": 6072.0,
+        "edges": 6158.0,
+        "degree_2": 5791.0,
+        "curve_f1_0.5mm": 1.0,
+        "curve_acd_mm": 1.7185274981457718e-15,
+        "curve_hd95_mm": 4.0384059021175725e-15,
+        "length_weighted_absolute_branch_length_error_fraction": 0.0,
+        "length_weighted_tortuosity_error": 0.0
+      }
+    },
+    "TopBrain-CT": {
+      "junction_only": {
+        "nodes": 181.0,
+        "edges": 249.0,
+        "degree_2": 0.0,
+        "curve_f1_0.5mm": 0.3469179654464178,
+        "curve_acd_mm": 2.387169954293721,
+        "curve_hd95_mm": 12.014123263817947,
+        "length_weighted_absolute_branch_length_error_fraction": 0.36197364137946897,
+        "length_weighted_tortuosity_error": 0.9552793840775748
+      },
+      "adaptive": {
+        "nodes": 581.0,
+        "edges": 649.0,
+        "degree_2": 400.0,
+        "curve_f1_0.5mm": 0.7684619702131548,
+        "curve_acd_mm": 0.3370565843047277,
+        "curve_hd95_mm": 0.8472549819996144,
+        "length_weighted_absolute_branch_length_error_fraction": 0.15426176677578182,
+        "length_weighted_tortuosity_error": 0.3096837253979656
+      },
+      "dense": {
+        "nodes": 3161.0,
+        "edges": 3229.0,
+        "degree_2": 2980.0,
+        "curve_f1_0.5mm": 1.0,
+        "curve_acd_mm": 2.090967019554335e-15,
+        "curve_hd95_mm": 7.850912980299312e-15,
+        "length_weighted_absolute_branch_length_error_fraction": 0.0,
+        "length_weighted_tortuosity_error": 0.0
+      }
+    },
+    "TopBrain-MR": {
+      "junction_only": {
+        "nodes": 182.0,
+        "edges": 224.0,
+        "degree_2": 0.0,
+        "curve_f1_0.5mm": 0.25067323547605325,
+        "curve_acd_mm": 3.1224736138790625,
+        "curve_hd95_mm": 14.27946417310875,
+        "length_weighted_absolute_branch_length_error_fraction": 0.37773261919661094,
+        "length_weighted_tortuosity_error": 0.9343484939923931
+      },
+      "adaptive": {
+        "nodes": 692.0,
+        "edges": 734.0,
+        "degree_2": 510.0,
+        "curve_f1_0.5mm": 0.8000187639785051,
+        "curve_acd_mm": 0.3324186054623963,
+        "curve_hd95_mm": 0.9251957093737484,
+        "length_weighted_absolute_branch_length_error_fraction": 0.158566182742569,
+        "length_weighted_tortuosity_error": 0.31527790448177073
+      },
+      "dense": {
+        "nodes": 6830.0,
+        "edges": 6872.0,
+        "degree_2": 6648.0,
+        "curve_f1_0.5mm": 1.0,
+        "curve_acd_mm": 2.0109658864583758e-15,
+        "curve_hd95_mm": 4.924345702383808e-15,
+        "length_weighted_absolute_branch_length_error_fraction": 0.0,
+        "length_weighted_tortuosity_error": 0.0
+      }
+    }
+  }
+}

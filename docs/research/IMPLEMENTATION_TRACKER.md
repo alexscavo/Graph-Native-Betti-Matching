@@ -14,11 +14,14 @@ screenshot under `evidence/<task-id>/` so results can be independently reviewed.
 
 ## Current position
 
-- Current phase: Phase 2 — full-dataset production extraction and policy audit.
-- Next task: inspect the 35 IXI patches above 192 nodes and evaluate a uniform
-  query capacity that covers the complete distribution without re-simplifying
-  individual patches; finish the remaining representation metrics. Dataset
-  relocation is complete; training configuration remains unchanged.
+- Current phase: Phase 3 — subdivision-invariant branch topology evaluation.
+  The focused Phase 2 study is complete on 30 real stratified volumes (scope
+  and caveats: [`evidence/T05/`](evidence/T05/)). A standalone Branch F1 has
+  passed focused tests and two real-graph smoke checks. Phase 5 data/capacity
+  preparation has been done early, but model training has not started.
+- Next task: finish T07 by integrating world-coordinate Branch F1 into model
+  evaluation, then complete the T08 failure-case matrix before any model
+  training comparison. False fused-vessel loops remain independent QC work.
 
 ## Ordered task list
 
@@ -28,12 +31,12 @@ screenshot under `evidence/<task-id>/` so results can be independently reviewed.
 | T02 | Enforce the IXI638/IXI661 annotation overrides and record provenance | 1 | complete |
 | T03 | Emit junction-only, adaptive, and dense comparison representations | 1 | complete |
 | T04 | Preserve and name an immutable dense reference before simplification | 1 | complete |
-| T05 | Implement representation geometry, morphology, and complexity metrics | 2 | in progress |
-| T06 | Run the rate-distortion study across sites and acquisition resolutions | 2 | in progress |
-| T07 | Implement degree-2 contraction, physical anchor matching, and Branch F1 | 3 | not started |
-| T08 | Validate metrics on the prescribed handcrafted failure cases | 4 | not started |
+| T05 | Implement representation geometry, morphology, and complexity metrics | 2 | complete (30-volume scoped study) |
+| T06 | Run the rate-distortion study across sites and acquisition resolutions | 2 | complete (five sampled strata; transfer caveats) |
+| T07 | Implement degree-2 contraction, physical anchor matching, and Branch F1 | 3 | in progress (standalone + real checks; evaluator integration pending) |
+| T08 | Validate metrics on the prescribed handcrafted failure cases | 4 | in progress (targeted topology cases only) |
 | T09 | Generate/smoke-test IXI patches and retrain with optimization unchanged | 5 | in progress |
-| T10 | Benchmark 120 versus 192 object queries on paired real IXI patches | 5 | complete |
+| T10 | Benchmark 120 versus 192 and 192 versus 256 object queries on paired real IXI patches | 5 | complete |
 
 ## Decision log
 
@@ -115,6 +118,12 @@ screenshot under `evidence/<task-id>/` so results can be independently reviewed.
   patches are preserved in the dataset and must fail explicitly if fed into a
   192-query model. Measure a uniform 240/256-query alternative or an explicit
   overflow policy before full-IXI training; do not silently discard targets.
+- Follow-up (2026-09-21): 256 queries cover the observed IXI maximum of 239
+  nodes. The paired real-IXI H100 benchmark found +7.51% mean step time and
+  +0.085 GiB peak allocation relative to 192; a 239-node patch completed a
+  training step. This resolves *capacity*, not convergence, graph correctness,
+  or the treatment of negative validation/test crops. Evidence:
+  [`evidence/ixi_capacity_192_256/`](evidence/ixi_capacity_192_256/).
 
 ### D07 — Direct dataset output and explicit patch eligibility
 
@@ -133,6 +142,104 @@ screenshot under `evidence/<task-id>/` so results can be independently reviewed.
   foreground-negative examples, while including them unintentionally in
   graph-learning runs distorts the target distribution. Graph-free but
   mask-positive border slabs require separate QC, not silent relabeling.
+
+### D08 — Reuse CaravelMetrics as a graph-evaluation reference, not an extractor
+
+- Date: 2026-09-21
+- Status: length/branch geometry comparisons validated on a stratified sample;
+  optional spline/fractal or anatomical-biomarker claims remain unvalidated
+- Source: [CaravelMetrics feature definitions](https://github.com/i-vesseg/CaravelMetrics/blob/master/docs/FEATURES.md).
+- Decision: first reuse *definitions and comparison ideas* for total physical
+  vessel length, branch-wise arc/chord tortuosity, endpoint/junction counts and
+  density, component count, and cycle rank. Compute these on the **three saved
+  graph representations** or on their ordered branch polylines; the model does
+  not need to output a centerline. Our `representation_geometry.py` already
+  has physical polyline length, arc/chord tortuosity, curve F1, ACD, HD95, and
+  graph complexity; `branch_evaluation.py` has paired branch length/tortuosity
+  errors and a discrete turning proxy. Extend/report the missing summaries and
+  junction-angle error before introducing new curvature estimators.
+- Caveats: a cycle *rank* (β₁) does not count all simple loops and cannot alone
+  establish that a cycle is anatomically real; node degree >3 is a **QC flag**,
+  not automatically pathological. Define bifurcation density on the same
+  physical reference length across representations, and exclude or label
+  artificial patch-boundary nodes. For closed branches and near-zero chords,
+  arc/chord tortuosity is undefined/infinite and must be reported separately.
+- Defer spline curvature and fitting RMSE until an explicit sampling/smoothing
+  sensitivity study; optional box-counting fractal dimension/lacunarity must
+  use a common physical field of view and scales to avoid confusing crop size,
+  resolution, or graph sampling density with anatomy. Segmentation-derived
+  radius/diameter/volume are useful **GT-only diagnostics**, not free
+  inference-time features of a model predicting only nodes and edges.
+- Do not adopt CaravelMetrics' skeletonization, orphan-linking, Laplacian
+  smoothing, mesh geodesic, or longest-edge triangle deletion as production
+  graph repair. Their effects on real IXI/TopBrain topology and lumen geometry
+  need independent, visually reviewed validation. False fused-vessel loops
+  remain an open QC concern (see `loop_failure_mitigation.md`).
+
+## Immediate ordered work (updated 2026-09-21)
+
+1. **T05 [complete, scoped study]:** run the saved full-volume three-representation comparison in
+   physical coordinates. Include node/edge and degree-2 budgets, curve
+   F1/ACD/HD95, matched branch length and tortuosity, junction-angle error,
+   β₀/β₁, and explicit boundary/closed-branch rules. Write CSV/JSON and
+   representative graph-only screenshots/interactive HTML. Validate any new
+   metric with tests; do not claim CaravelMetrics' results transfer here.
+2. **T06 [complete, sampled site/spacing study] + QC [ongoing]:** summarize per-subject and by IXI site/voxel spacing versus
+   TopBrain MR/CT, plus radius/curvature/density strata. Inspect suspected
+   false loops and graph-free foreground on real segmentations/images; report
+   failures and annotation uncertainty, without silent graph repair. Preserve
+   the complete validation/test grids for unbiased evaluation.
+3. **T07/T08 [in progress]:** implement deterministic degree-2 contraction, spatial anchor
+   matching and Branch F1; test subdivision invariance, false links, breaks,
+   shifted geometry, cycles and shared-border effects on small *metric tests*.
+   Real-volume screenshots remain necessary for extractor claims.
+4. **Phase 0 + T09:** freeze a comparable model baseline/checkpoint and
+   evaluate the fixed adaptive target. Confirm the one-dataset choice and
+   negative-crop evaluation protocol before launching training; for IXI, use
+   the tested uniform 256-query capacity (not a per-patch re-simplification).
+   Record runtime, convergence and model metrics against adaptive GT **and**
+   the dense-reference oracle. Only then consider junction-only/dense ablations.
+
+### T05/T06 outcome — focused full-volume representation study
+
+Thirty real full volumes (six per IXI Guys/HH/IOP and TopBrain CT/MR stratum)
+were evaluated with fixed branch identities and physical-space straight graph
+edges. Adaptive beats junction-only in branch-paired 0.5-mm Curve F1 and ACD
+on **30/30**, uses fewer nodes than dense on **30/30**, and preserves extracted
+β₀/β₁ on **30/30**. Across strata, adaptive mean F1 at 0.5 mm is 0.757–0.893,
+versus 0.227–0.306 for junction-only; at 1 mm adaptive reaches 0.966–0.998.
+Its mean ACD is 0.271–0.366 mm. The apparent 14.7–16.1% raw-dense length
+shortening is predominantly 13.4–14.5 percentage points of smoothing, plus
+1.4–2.2 of adaptive straight-edge simplification. Twice-denser sampling on
+one IXI and one TopBrain case moved 0.5-mm F1 by <0.006. Existing unit tests
+verify subdivision invariance, directionality, bend sensitivity, parallel
+branch matching and explicit degenerate-cycle treatment. Summary/CSV/PNG and
+graph-only interactive 3D views: [`evidence/T05/`](evidence/T05/).
+
+This is sufficient to select adaptive as a *provisional compact target* and
+move to Phase 3. It is not a claim of anatomically valid raw dense paths or
+correct loops: these three representations inherit the same extracted
+topology. Source IXI spacing is nearly constant within each site and this
+study is not an exhaustive 220-volume or external-dataset audit. The
+previous unbounded local audit processed 79 subjects but was terminated
+before saving complete results; no unsaved measurements are included.
+
+### T07 early validation on real saved graph families
+
+`metrics/branch_connectivity.py` contracts degree-2 chains while preserving
+ordered branch polylines, assigns nearby physical-space anchors one-to-one by
+role, and scores branch connectivity separately from geometric overlap.
+Unanchored pure rings receive one virtual closed branch with a length-weighted
+spatial centroid; parallel branches retain multiplicity. Tests cover
+subdivision, displacement, wrong branch pairing with equal Betti numbers,
+missing/extra branches, nonconnecting line crossings, pure rings and empty
+graphs. On the real IXI122 and TopBrain CT-001 full graphs, adaptive vs dense
+scores Branch F1=1.0 despite different geometry-node counts; deleting one
+edge of each saved adaptive graph lowers F1 to 0.9977 and 0.9899 respectively.
+These are **controlled real-graph perturbations**, not model predictions.
+Machine-readable scores and plot are in [`evidence/T07/`](evidence/T07/).
+The evaluator must convert normalized patch coordinates to world millimetres
+before this metric is used for model checkpoints; this has not been wired yet.
 
 ## Evidence log
 

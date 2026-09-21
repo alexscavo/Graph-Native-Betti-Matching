@@ -179,7 +179,7 @@ identical across representations. Adaptive versus dense node counts are 141 vs
 924, 110 vs 807, and 314 vs 2141. This supports compression without topology
 change, but does not yet establish geometric fidelity or resolution invariance.
 Data, regeneration commands, and overview visualization:
-[`evidence/real_ixi/`](evidence/real_ixi/).
+superseded exploratory evidence (removed).
 
 ### E07 — Real IXI bad-loop and chord diagnosis
 
@@ -189,7 +189,7 @@ less than 50% chord containment. Radius-normalized RDP reduced these to 0, 2,
 and 3 at radius fraction 0.6, but beta-1 was unchanged for every policy. Thus
 radius adaptation improves geometry but cannot repair segmentation-derived
 topology. Data and visualization:
-[`evidence/real_ixi_loop_diagnosis/`](evidence/real_ixi_loop_diagnosis/).
+superseded exploratory evidence (removed).
 
 Training-data generation remains paused until the containment contract and
 raw-MRA-supported false-bridge validation in
@@ -202,7 +202,7 @@ On a real IXI002 crop, raw voxel-centre paths have a 45.0° median sample-to-sam
 turn angle; constrained smoothing reduces this to 6.6°. Adaptive graph nodes are
 not voxel restricted (28.4% sub-voxel in the crop; 46.5% in the whole-volume
 audit), and every training VTP edge is encoded as a straight two-point line.
-Evidence: [`evidence/real_ixi_geometry/`](evidence/real_ixi_geometry/).
+Superseded exploratory evidence (removed).
 
 The preliminary whole-volume IXI002 audit finds mean/p95/p99 patch edge counts of
 21.7/63.0/78.6. Five of 175 non-empty patches exceed the preferred 70-edge
@@ -210,7 +210,7 @@ ceiling and one reaches 139, although no patch exceeds 120 nodes. This means the
 typical patch is acceptable but the complexity tail requires topology cleaning
 and/or a budget-aware representation policy. CPU Slurm array job `2141634` is
 pending for the three-representation, three-subject audit. Evidence:
-[`evidence/real_ixi_patch_budget/`](evidence/real_ixi_patch_budget/).
+superseded exploratory evidence (removed).
 
 ## Dense intermediate and lumen-safe compact geometry (2026-09-18)
 
@@ -226,7 +226,7 @@ adaptive graph has 244 nodes / 276 edges versus 983 / 1015 dense, with minimum
 edge-chord lumen containment 1.0. Junction-only has 98 / 130 but minimum
 containment 0.106, so it remains a topology-preserving ablation rather than the
 recommended geometric target. See
-[`evidence/real_ixi_containment/`](evidence/real_ixi_containment/).
+superseded exploratory evidence (removed).
 
 The reusable evaluator `scripts/compare_dense_centerlines.py` emits CSV, JSON,
 PNG and interactive HTML, and `metrics/representation_geometry.py` supplies
@@ -249,7 +249,7 @@ Real IXI evidence rejected it. On the IXI002 crop, adaptive complexity worsened
 from 244 nodes / 276 edges / β₁=37 to 363 / 411 / β₁=49, and visual tangles
 remained. The legacy extractor was restored as the default; Vedo is available
 only by explicit selection for reproducibility. See
-[`evidence/real_ixi_vedo/`](evidence/real_ixi_vedo/).
+superseded exploratory evidence (removed).
 
 ## New IXI and TopBrain restart (2026-09-18)
 
@@ -258,7 +258,7 @@ restarted on newly supplied data using the better pre-Vedo (`legacy`) backend.
 The first subjects are improved-segmentation IXI122 and multiclass TopBrain
 MRA subject 001. Fresh interactive 3-D reports, static 3-D views, measurements
 and densest-64³ patch counts are in
-[`evidence/new_datasets_baseline/`](evidence/new_datasets_baseline/).
+superseded exploratory evidence (removed).
 
 Both adaptive representations preserve dense β₀/β₁ and have complete lumen
 containment. Densest 64³ adaptive patches contain 99 IXI edges and 79 TopBrain
@@ -273,7 +273,7 @@ in voxel coordinates (important for TopBrain's oblique affine) and uses
 `SourceGraph.crop_inherited()`: a crossing edge terminates at its last existing
 centerline sample inside the patch, without an interpolated box-face node.
 Results and full-volume visualizations are in
-[`evidence/full_volume_then_crop/`](evidence/full_volume_then_crop/).
+superseded exploratory evidence (removed).
 
 ## Exact boundary intersections selected (2026-09-18)
 
@@ -290,7 +290,7 @@ TopBrain-MR-001 patches it produced identical topology and token counts, but
 terminated crossing edges approximately 0.42 voxel inside the true face. Exact
 clipping therefore strictly improves boundary geometry without increasing the
 graph budget in these tests. Metrics, JSON, PNG, and interactive comparisons
-are in [`evidence/full_volume_then_crop/crop_policy_comparison/`](evidence/full_volume_then_crop/crop_policy_comparison/).
+are superseded by the complete production inventory.
 
 The complete extraction inventory contains 220 paired volumes: 170 IXI MRA,
 25 TopBrain MR, 18 TopBrain CT training, and 7 labeled TopBrain CT test cases.
@@ -306,7 +306,7 @@ not valid on Jean Zay and is intentionally omitted.
 
 Full-dataset extraction was submitted as Slurm array job `2161189` with tasks
 `0-219%12`. Outputs are written below
-`docs/research/artifacts/real_graph_dataset/`; rerunning the launcher safely
+`dataset-local vascular_graphs outputs/`; rerunning the launcher safely
 skips volumes whose configuration-fingerprinted completion marker and nine
 graph files are present.
 
@@ -324,7 +324,7 @@ policy.
 
 Model-only full-volume adaptive views (straight edges plus every termination,
 degree-2 subdivision, and junction; no centerline polylines) are recorded in
-[`evidence/full_volume_then_crop/adaptive_all_nodes/`](evidence/full_volume_then_crop/adaptive_all_nodes/).
+current full-dataset sample views.
 
 ## Initial greedy-RDP policy selection, now superseded (2026-09-19)
 
@@ -347,11 +347,11 @@ initial global dataset-agnostic policy before the exact solver below.
 
 An independent audit found zero radius-1.5× edges below the configured 95%
 containment floor (13,527 edges total; mean containment 99.82%). Budget data and plots are in
-[`evidence/adaptive_tuning/results_stage2_14/`](evidence/adaptive_tuning/results_stage2_14/),
+[retained compact policy comparison],
 geometry data and plots in
-[`evidence/adaptive_tuning/geometry_14/`](evidence/adaptive_tuning/geometry_14/),
+[retained compact policy comparison],
 and graph-only PNG/interactive HTML views for IXI425 and TopBrain-MR-002 in
-[`evidence/adaptive_tuning/selected_radius1p5x/`](evidence/adaptive_tuning/selected_radius1p5x/).
+[retained compact policy comparison].
 
 Patch overflow is not caused by unavoidable topology. For radius-1.5×, the 57
 patches above 120 contain on average 32.2 topological nodes, 20.6 exact boundary
@@ -364,7 +364,7 @@ subject to confirmation on the complete dataset and a GPU memory benchmark.
 Training now raises an explicit error when a target exceeds query capacity,
 instead of letting Hungarian matching silently omit unmatched ground-truth
 nodes. Evidence is in
-[`evidence/adaptive_tuning/overflow_14/`](evidence/adaptive_tuning/overflow_14/).
+[retained compact overflow summary].
 
 The audit also exposed and fixed a serialization defect: six-decimal world
 coordinates in `nodes.csv` could move a junction by approximately 1e-7 voxel
@@ -553,3 +553,8 @@ mask-only negatives deserve their own treatment.
   default to dataset-local production output; the loader exposes an optional
   index-validated graph-positive patch selection, with no training config
   altered. No relocation or additional extraction job was submitted.
+- 2026-09-21: Cleared superseded staging artifacts and exploratory visual
+  dumps from `docs/research/`. Retained only foundational checks, compact
+  adaptive-policy comparisons, the query benchmark final report, and the
+  full-dataset production/QC evidence. The current source of production data
+  is the dataset-local `vascular_graphs/` and `vascular_patches/` layout.

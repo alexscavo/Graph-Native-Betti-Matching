@@ -101,7 +101,7 @@ on when reserving wall time.
 - [`estimate.csv`](estimate.csv): machine-readable timing assumptions and
   totals.
 - [`estimate.png`](estimate.png): stage and GPU-layout comparison.
-- TopBrain volume shapes come from
-  `docs/research/artifacts/real_graph_dataset/extraction_manifest.csv`.
+- TopBrain volume shapes come from the dataset-local graph completion markers
+  under `TopBrain_Data_Release_Batches1n2_081425/vascular_graphs/`.
 - The empirical H100 anchor is in
   `../ixi_query_benchmark/final/summary.json`.

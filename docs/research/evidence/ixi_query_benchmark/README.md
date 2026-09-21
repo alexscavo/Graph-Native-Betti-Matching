@@ -21,10 +21,9 @@ same shuffled training batches and seed are used for the 120- and 192-query
 cases. A separate overflow dataset contains every patch above 120 nodes; its
 largest patch is exercised with a complete 192-query training step.
 
-Selection evidence is under [`selection/`](selection/), and stable benchmark
-outputs are under [`final/`](final/). Generated NIfTI/VTP
-patches live under `docs/research/artifacts/ixi_query_benchmark/` and are not
-committed.
+The retained benchmark outputs are under [`final/`](final/). The temporary
+selection manifests and generated NIfTI/VTP patches were removed after the
+benchmark was completed; the final logs, timings, checksums, and summary remain.
 
 ## What is measured
 
@@ -45,6 +44,10 @@ and augmentations are disabled identically in both cases, and no Plants or
 TopBrain samples are configured.
 
 ## Reproduction
+
+The original reproduction command used temporary staging under
+`docs/research/artifacts/`. Those staging outputs were deliberately cleared;
+future reruns should use the dataset-local vascular graph and patch folders.
 
 ```bash
 .venv/bin/python scripts/prepare_ixi_query_benchmark_sources.py \

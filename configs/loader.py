@@ -636,6 +636,11 @@ def validate_config(config: Mapping[str, Any]) -> None:
     for name in ("target_node_size", "edge_half_width", "smd_epsilon"):
         if float(protocol.get(name, 0.0)) <= 0:
             raise ConfigError(f"evaluation.protocol.{name} must be positive")
+    if "branch_threshold_mm" in protocol:
+        threshold = protocol["branch_threshold_mm"]
+        if (isinstance(threshold, bool) or not isinstance(threshold, (int, float))
+                or not math.isfinite(threshold) or threshold <= 0):
+            raise ConfigError("evaluation.protocol.branch_threshold_mm must be finite and positive")
 
 
 def load_config(

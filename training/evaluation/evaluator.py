@@ -12,6 +12,7 @@ import torch
 
 from .inference import infer_graphs
 from .metrics import evaluate_graph, summarize_metrics
+from .physical_coordinates import PatchPhysicalCoordinates
 from .visualization import save_graph_comparison
 
 
@@ -125,6 +126,9 @@ def evaluate_model(
     if output_dir is not None:
         output_dir.mkdir(parents=True, exist_ok=True)
     dataset_records = getattr(getattr(loader, "dataset", None), "records", ())
+    physical = PatchPhysicalCoordinates() if "branch_threshold_mm" in protocol else None
+    if physical is not None and not dataset_records:
+        raise ValueError("Physical Branch F1 needs dataset records with patch provenance")
 
     for batch in loader:
         volumes = _evaluation_volumes(
@@ -152,6 +156,12 @@ def evaluate_model(
                 batch[2][local_index],
                 batch[3][local_index],
                 protocol=protocol,
+                world_transform=(
+                    physical.transform(
+                        dataset_records[sample_index],
+                        coordinate_space=getattr(loader.dataset, "coordinate_space", "normalized"),
+                    ) if physical is not None else None
+                ),
                 return_detection_states=True,
             )
             rows.append(metrics)

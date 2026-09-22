@@ -75,3 +75,34 @@ def test_invalid_graphs_and_thresholds_are_rejected():
         evaluate(graph, graph, tol=-1)
     with pytest.raises(ValueError, match="duplicate"):
         contract_degree_two(graph[0], [(0, 1), (1, 0)])
+
+
+def test_badly_misplaced_junction_is_not_hidden_by_matching_endpoints():
+    gt = (np.array([[0., 0.], [-2., 2.], [2., 2.], [0., -3.]]),
+          [(0, 1), (0, 2), (0, 3)])
+    moved = (gt[0].copy(), gt[1])
+    moved[0][0] = [0., 2.]
+    score = evaluate(moved, gt, tol=.25)
+    assert score["f1"] < 1 and score["gt_betti_1"] == score["predicted_betti_1"]
+
+
+def test_crossing_connection_and_isolated_detection_do_not_create_false_branch_matches():
+    base = np.array([[-2., 0.], [2., 0.], [0., -2.], [0., 2.]])
+    gt = (base, [(0, 1), (2, 3)])
+    extra_cross = (np.vstack((base, [[0., 0.]])),
+                   [(0, 4), (4, 1), (2, 4), (4, 3)])
+    assert evaluate(extra_cross, gt)["f1"] < 1
+    # Query-based models can output extra isolated nodes; these must not make
+    # matching a tiny two-edge patch prohibitively expensive or affect F1.
+    extra_isolates = (np.vstack((base, np.ones((256, 2)) * 20.)), gt[1])
+    assert evaluate(extra_isolates, gt)["f1"] == 1
+
+
+def test_a_break_and_a_wrong_bridge_between_nearby_vessels_are_penalized():
+    base = np.array([[0., 0.], [4., 0.], [0., .4], [4., .4]])
+    gt = (base, [(0, 1), (2, 3)])
+    broken = (np.vstack((base, [[1.9, 0.], [2.1, 0.]])),
+              [(0, 4), (5, 1), (2, 3)])
+    bridged = (base, [(0, 1), (2, 3), (0, 2)])
+    assert evaluate(broken, gt, tol=.25)["f1"] < 1
+    assert evaluate(bridged, gt, tol=.25)["f1"] < 1

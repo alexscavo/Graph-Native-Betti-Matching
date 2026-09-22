@@ -106,7 +106,11 @@ def match_anchors(predicted: ContractedGraph, target: ContractedGraph, threshold
 
     if not np.isfinite(threshold_mm) or threshold_mm < 0:
         raise ValueError("threshold_mm must be finite and non-negative")
-    pred_ids, gt_ids = sorted(predicted.anchors), sorted(target.anchors)
+    # Isolated detections have no contracted branches, and therefore cannot
+    # contribute to a branch match. Skipping them avoids a potentially huge
+    # Hungarian matrix for query-based models that retain many isolates.
+    pred_ids = sorted(i for i in predicted.anchors if predicted.roles[i] != "isolated")
+    gt_ids = sorted(i for i in target.anchors if target.roles[i] != "isolated")
     p, g = len(pred_ids), len(gt_ids)
     if not p or not g:
         return {}

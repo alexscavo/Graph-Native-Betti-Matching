@@ -12,6 +12,10 @@ from typing import Mapping, Sequence
 import numpy as np
 import torch
 
+from metrics.branch_connectivity import branch_connectivity_f1
+
+from .physical_coordinates import to_world_mm
+
 
 IOU_THRESHOLDS = np.linspace(0.50, 0.95, 10, endpoint=True)
 RECALL_THRESHOLDS = np.linspace(0.0, 1.0, 101, endpoint=True)
@@ -353,6 +357,7 @@ def evaluate_graph(
     target_edges,
     *,
     protocol=None,
+    world_transform=None,
     return_detection_states=False,
 ):
     protocol = dict(protocol or {})
@@ -406,6 +411,18 @@ def evaluate_graph(
     metrics["edge_count_absolute_error"] = abs(
         metrics["predicted_edges"] - metrics["target_edges"]
     )
+    if "branch_threshold_mm" in protocol:
+        if world_transform is None:
+            raise ValueError("Physical Branch F1 needs a source-volume world transform")
+        branch = branch_connectivity_f1(
+            to_world_mm(predicted_nodes.numpy(), world_transform),
+            canonical_edges(predicted_edges, len(predicted_nodes)),
+            to_world_mm(target_nodes.numpy(), world_transform),
+            canonical_edges(target_edges, len(target_nodes)),
+            threshold_mm=float(protocol["branch_threshold_mm"]),
+        )
+        for name in ("tp", "fp", "fn", "precision", "recall", "f1", "matched_anchors"):
+            metrics["branch_" + name] = branch[name]
     # Fixed-operating-point F1 uses ALL retained detections, not the AP cap.
     # Keep the historical AP/AR matching states and aggregation unchanged.
     f1_protocol = dict(protocol)
@@ -487,7 +504,7 @@ def summarize_metrics(
         summary[name + "_std"] = (
             float(np.std(fold_means, ddof=1)) if len(fold_means) > 1 else 0.0
         )
-    for prefix in ("node", "edge"):
+    for prefix in ("node", "edge", "branch"):
         count_names = [prefix + "_" + kind for kind in ("tp", "fp", "fn")]
         if not all(name in names for name in count_names):
             continue  # Backwards-compatible summaries of old metric rows.

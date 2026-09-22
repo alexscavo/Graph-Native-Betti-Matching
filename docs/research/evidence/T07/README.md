@@ -20,6 +20,28 @@ The metric currently rejects direct self-loop edges; our normal adaptive and
 dense products express rings as spatially embedded multi-edge cycles. A
 junction-only full-volume export can contain self-loop edges and must not be
 passed to this implementation without an explicit representation conversion.
-Model integration must first convert normalized patch coordinates to physical
-world coordinates. Remaining Phase 4 metric cases and end-to-end evaluation
-are tracked in `docs/research/IMPLEMENTATION_TRACKER.md`.
+The model evaluator now optionally computes physical Branch F1 on generated
+vessel patches when `evaluation.protocol.branch_threshold_mm` is set. The
+IXI-only configuration uses 1.0 mm. The conversion reconstructs world
+coordinates from `patch_index.csv`, `generation_config.json`, the original
+source NIfTI affine in `source_manifest.json`, and the normalized graph points.
+The saved patch NIfTI headers have identity affines and must **not** be used
+to infer physical spacing. Evaluation fails clearly when provenance is absent.
+Default/legacy evaluation is unchanged when the metric is disabled. Isolated
+predicted nodes are excluded from anchor matching since they contain no branch
+(their counts remain available in the legacy diagnostics).
+The dataset-level `branch_f1` is computed from summed TP/FP/FN (micro F1),
+not by averaging per-patch scores. Two empty graphs have per-patch F1=1,
+so micro aggregation avoids inflated dataset scores from empty validation
+patches. Isolated-node false positives are assessed separately by node/count
+metrics; Branch F1 alone does not penalize them.
+
+In [two real IXI validation patches](ixi_patches/ixi_patch_edge_ablation.png)
+from different volumes, self-comparison gives Branch F1 = 1.000, whereas
+removing a single saved graph edge drops the score to 0.857 and 0.783. The
+[per-patch JSON](ixi_patches/ixi_patch_edge_ablation.json) includes physical
+axis scale and the deleted edge. This is a controlled oracle/ablation check,
+**not a trained-model evaluation or independent anatomical ground truth**.
+`scripts/validate_branch_metric_on_ixi_patches.py` regenerates the evidence.
+Remaining Phase 4 multi-metric failure-case validation and eventual model
+training/evaluation are tracked in `docs/research/IMPLEMENTATION_TRACKER.md`.

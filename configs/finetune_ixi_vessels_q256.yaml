@@ -21,3 +21,8 @@ data:
 model:
   decoder:
     object_queries: 256
+
+evaluation:
+  protocol:
+    # Source-volume NIfTI affine + recorded crop origin; patch headers are identity.
+    branch_threshold_mm: 1.0

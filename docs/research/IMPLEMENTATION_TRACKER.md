@@ -14,14 +14,17 @@ screenshot under `evidence/<task-id>/` so results can be independently reviewed.
 
 ## Current position
 
-- Current phase: Phase 3 — subdivision-invariant branch topology evaluation.
+- Current phase: Phase 4 — controlled metric failure-case validation.
   The focused Phase 2 study is complete on 30 real stratified volumes (scope
   and caveats: [`evidence/T05/`](evidence/T05/)). A standalone Branch F1 has
-  passed focused tests and two real-graph smoke checks. Phase 5 data/capacity
-  preparation has been done early, but model training has not started.
-- Next task: finish T07 by integrating world-coordinate Branch F1 into model
-  evaluation, then complete the T08 failure-case matrix before any model
-  training comparison. False fused-vessel loops remain independent QC work.
+- passed focused tests and two real-graph smoke checks; the model evaluator
+  now accepts physically reconstructed IXI patch coordinates and a 1.0 mm
+  Branch F1 threshold. Phase 5 data/capacity preparation was done early, but
+  model training has not started.
+- Next task: finish T08's remaining SMD/node-edge detection versus connectivity
+  failure checks, then freeze the baseline and run
+  a controlled IXI-only adaptive-GT model comparison. False fused-vessel
+  loops remain independent QC work.
 
 ## Ordered task list
 
@@ -33,10 +36,34 @@ screenshot under `evidence/<task-id>/` so results can be independently reviewed.
 | T04 | Preserve and name an immutable dense reference before simplification | 1 | complete |
 | T05 | Implement representation geometry, morphology, and complexity metrics | 2 | complete (30-volume scoped study) |
 | T06 | Run the rate-distortion study across sites and acquisition resolutions | 2 | complete (five sampled strata; transfer caveats) |
-| T07 | Implement degree-2 contraction, physical anchor matching, and Branch F1 | 3 | in progress (standalone + real checks; evaluator integration pending) |
-| T08 | Validate metrics on the prescribed handcrafted failure cases | 4 | in progress (targeted topology cases only) |
+| T07 | Implement degree-2 contraction, physical anchor matching, and Branch F1 | 3 | complete (evaluator + 2 real IXI patch ablations) |
+| T08 | Validate metrics on the prescribed handcrafted failure cases | 4 | in progress (branch/geometry/Betti contrasted; SMD and detection checks pending) |
 | T09 | Generate/smoke-test IXI patches and retrain with optimization unchanged | 5 | in progress |
 | T10 | Benchmark 120 versus 192 and 192 versus 256 object queries on paired real IXI patches | 5 | complete |
+
+### 2026-09-22 — physical Branch F1 integration and real patch checks
+
+The evaluator reports per-patch `branch_{tp,fp,fn,precision,recall,f1}`
+and micro-aggregated `branch_f1` if a physical-mm threshold is configured.
+The IXI experiment config enables 1.0 mm; other experiments keep the previous
+metric protocol. Full source-affine coordinates are reconstructed from the
+dataset patch index and source manifest, **not** the identity-affine patch
+NIfTI. [Two real IXI validation patch ablations](evidence/T07/ixi_patches/ixi_patch_edge_ablation.png)
+and [machine-readable scores](evidence/T07/ixi_patches/ixi_patch_edge_ablation.json)
+show 1.000 -> 0.857 and 1.000 -> 0.783 after removing one actual graph edge;
+no model weights or anatomical truth are involved. Focused evaluator,
+physical-provenance, and branch tests passed. The single-edge changes test
+the metric's sensitivity, **not** whether real model predictions improve.
+The evaluator's computed Branch F1 was checked against the standalone score
+on both of these saved IXI patches. Focused Phase 4 unit cases also show that
+a small real-world-coordinate break or an extra close bridge can score
+Curve F1=1 at the chosen tolerance while Branch F1 drops; conversely,
+altering only the interior degree-2 path can preserve Branch F1 while Curve
+F1/ACD/HD95 worsen. Wrong branch pairings can leave both Betti numbers
+unchanged. These are *metric-behavior synthetic controls*, not evidence of
+extractor anatomical quality; those claims still rely on real-image checks.
+Training is unnecessary for T07/T08 metric validation, but is necessary for
+Phases 5–7 to establish learned graph quality and convergence.
 
 ## Decision log
 

@@ -5,11 +5,13 @@ volumes, vessel segmentations and brain masks, reduced to sparse vessel graphs
 and cut into 64-cubed patches in the layout the SyntheticMRI loader already
 consumes.
 
-**Status as of writing: source extraction is implemented and validated on one
-subject; the patch-generation stage has not yet been confirmed to run on IXI
-sources, and the data-loader smoke test has not completed.** Sections 1–8
-document measurements that are done. Section 9 documents a pipeline whose
-second stage is still pending verification.
+**Historical research note.** Sections 1–8 describe the earlier IXI dataset
+and extraction experiments. The old commands in sections 9–10 are superseded
+and their one-off scripts were removed. The current 170-volume IXI and
+50-volume TopBrain workflow, with both selectable centerline backends, is
+documented in [the scripts guide](../scripts/README.md) and
+[the production run tracker](research/VEDO_PRODUCTION_RUN.md). The current
+Vedo graphs and single-patch train/validation/test sets are complete.
 
 ## 1. Purpose and scope
 

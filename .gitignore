@@ -13,6 +13,7 @@ __pycache__/
 *$py.class
 .python-version
 .venv/
+.venv
 venv/
 env/
 .env
@@ -67,6 +68,7 @@ events.out.tfevents.*
 *.pt
 *.pth
 *.ckpt
+core-python-*
 
 # Local datasets and generated samples
 datasets/

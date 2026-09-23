@@ -14,17 +14,21 @@ screenshot under `evidence/<task-id>/` so results can be independently reviewed.
 
 ## Current position
 
-- Current phase: Phase 4 — controlled metric failure-case validation.
-  The focused Phase 2 study is complete on 30 real stratified volumes (scope
-  and caveats: [`evidence/T05/`](evidence/T05/)). A standalone Branch F1 has
-- passed focused tests and two real-graph smoke checks; the model evaluator
-  now accepts physically reconstructed IXI patch coordinates and a 1.0 mm
-  Branch F1 threshold. Phase 5 data/capacity preparation was done early, but
-  model training has not started.
-- Next task: finish T08's remaining SMD/node-edge detection versus connectivity
-  failure checks, then freeze the baseline and run
-  a controlled IXI-only adaptive-GT model comparison. False fused-vessel
-  loops remain independent QC work.
+- Current phase: Phase 5 — IXI-only training integration smoke test. The
+  focused Phase 2 study is complete on 30 real stratified volumes (scope and
+  caveats: [`evidence/T05/`](evidence/T05/)). Phase 3 Branch F1 is integrated
+  in the evaluator in physical coordinates. Phase 4 controlled metric checks,
+  including SMD and node/edge detection contrasts, are complete; see
+  [`evidence/T08/`](evidence/T08/). The 220-volume Vedo-original production
+  extraction and graph-positive patch sets are validated in
+  [`VEDO_PRODUCTION_RUN.md`](VEDO_PRODUCTION_RUN.md). No model-quality or
+  convergence result has been established yet.
+- Next task: monitor the IXI-only 100-epoch adaptive-GT run (two H100s,
+  Slurm job 93539), inspect its validation curves and real graph predictions,
+  then evaluate the selected checkpoint. The protocol and timing pilot are in
+  [`evidence/T09_long/`](evidence/T09_long/); the earlier bounded integration
+  smoke is in [`evidence/T09/`](evidence/T09/).
+  False fused-vessel loops remain independent QC work.
 
 ## Ordered task list
 
@@ -37,8 +41,8 @@ screenshot under `evidence/<task-id>/` so results can be independently reviewed.
 | T05 | Implement representation geometry, morphology, and complexity metrics | 2 | complete (30-volume scoped study) |
 | T06 | Run the rate-distortion study across sites and acquisition resolutions | 2 | complete (five sampled strata; transfer caveats) |
 | T07 | Implement degree-2 contraction, physical anchor matching, and Branch F1 | 3 | complete (evaluator + 2 real IXI patch ablations) |
-| T08 | Validate metrics on the prescribed handcrafted failure cases | 4 | in progress (branch/geometry/Betti contrasted; SMD and detection checks pending) |
-| T09 | Generate/smoke-test IXI patches and retrain with optimization unchanged | 5 | in progress |
+| T08 | Validate metrics on the prescribed handcrafted failure cases | 4 | complete (metric behavior only; not extractor/model quality) |
+| T09 | Generate/smoke-test IXI patches and retrain with optimization unchanged | 5 | in progress (100-epoch two-H100 job 93539 submitted; no quality result yet) |
 | T10 | Benchmark 120 versus 192 and 192 versus 256 object queries on paired real IXI patches | 5 | complete |
 
 ### 2026-09-22 — physical Branch F1 integration and real patch checks
@@ -66,6 +70,16 @@ Training is unnecessary for T07/T08 metric validation, but is necessary for
 Phases 5–7 to establish learned graph quality and convergence.
 
 ## Decision log
+
+### Evidence curation (2026-09-23)
+
+The [research index](README.md#evidence-to-show-the-decisions) now points to
+the evidence needed to explain each current choice. The superseded five-volume
+T05 pilot, a duplicated IXI Vedo smoke graph, CT-001 extraction intermediates,
+redundant diagnostic viewers, and a generated Python cache were removed from
+`evidence/` (about 25 MB). The 30-volume study, final CT-001 method comparison,
+production checks, capacity benchmarks, metric checks, and live IXI training
+evidence remain. Relative Markdown links in `docs/research` were verified.
 
 ### D01 — Representation of an anchorless ring
 

@@ -1,0 +1,20 @@
+defaults:
+  - finetune_ixi_vessels_q256.yaml
+
+# One-epoch real-I/O/metric timing gate before the 100-epoch run.
+experiment:
+  name: finetune_ixi_vessels_q256_pilot
+
+data:
+  datasets:
+    synthetic_mri:
+      train_samples: 512
+      validation_samples: 64
+
+training:
+  epochs: 1
+
+evaluation:
+  interval_epochs: 1
+  training_metrics:
+    max_samples: 64

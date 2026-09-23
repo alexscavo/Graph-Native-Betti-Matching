@@ -59,12 +59,8 @@ and 100 measured steps per case.
 
 ## Evidence
 
-- [`selection/patch_selection.png`](selection/patch_selection.png): real IXI
-  node-count distribution and capacity thresholds.
-- [`selection/selection_summary.json`](selection/selection_summary.json):
-  machine-readable patch inventory.
-- [`selection/source_manifest.json`](selection/source_manifest.json): seven
-  IXI-only input volumes and selected full-volume graph products.
+- The temporary seven-volume selection files were cleared during an earlier
+  research-folder cleanup; the selection counts and scope are recorded above.
 - [`final/comparison.png`](final/comparison.png): final time, throughput,
   and peak-memory comparison.
 - [`final/summary.json`](final/summary.json): complete metrics and overflow

@@ -1,0 +1,22 @@
+defaults:
+  - finetune_ixi_vessels_q256.yaml
+
+# Short IXI-only integration test; not a convergence or quality experiment.
+experiment:
+  name: finetune_ixi_vessels_q256_smoke
+
+data:
+  batch_size: 2
+  datasets:
+    synthetic_mri:
+      train_samples: 32
+      validation_samples: 16
+
+runtime:
+  workers: 2
+
+training:
+  epochs: 1
+
+evaluation:
+  interval_epochs: 1

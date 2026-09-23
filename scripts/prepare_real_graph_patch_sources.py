@@ -17,7 +17,9 @@ from typing import Iterable
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scripts.extract_real_graph_manifest import DATASET_DIRECTORIES, GRAPH_POLICY_DIRECTORY
+from scripts.extract_vessel_graphs import (
+    DATASET_DIRECTORIES, graph_policy_directory,
+)
 
 GRAPH_FILES = ("nodes.csv", "edges.csv", "graph.vvg")
 EXPECTED_CONFIGURATION = {
@@ -166,6 +168,7 @@ def main() -> int:
     graph_location.add_argument("--graph-root", type=Path, help="legacy combined graph root")
     graph_location.add_argument("--dataset-root", type=Path, help="dataset parent for direct graph output")
     parser.add_argument("--dataset", choices=tuple(DATASET_DIRECTORIES), help="stage only one dataset")
+    parser.add_argument("--centerline-backend", choices=("legacy", "vedo_original"), default="legacy")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--split-output", type=Path)
     parser.add_argument("--seed", type=int, default=42)
@@ -181,13 +184,17 @@ def main() -> int:
     if not rows:
         raise ValueError(f"empty manifest: {args.manifest}")
 
+    expected_configuration = {
+        **EXPECTED_CONFIGURATION, "centerline_backend": args.centerline_backend,
+    }
+
     records = []
     for row in rows:
         index = int(row["index"])
         patient_id = f"{index:06d}"
         volume_root = (
             args.dataset_root / DATASET_DIRECTORIES[row["dataset"]]
-            / "vascular_graphs" / GRAPH_POLICY_DIRECTORY
+            / "vascular_graphs" / graph_policy_directory(args.centerline_backend)
             / row["modality"] / row["split"] / row["subject"]
             if args.dataset_root is not None else
             args.graph_root / row["dataset"] / row["modality"] / row["split"] / row["subject"]
@@ -204,7 +211,7 @@ def main() -> int:
         configuration = marker.get("configuration", {})
         mismatches = {
             key: (configuration.get(key), expected)
-            for key, expected in EXPECTED_CONFIGURATION.items()
+            for key, expected in expected_configuration.items()
             if configuration.get(key) != expected
         }
         if mismatches:
@@ -270,7 +277,11 @@ def main() -> int:
         {"patient_id": record["patient_id"], "split": record["patch_split"]}
         for record in records
     ]
-    _write_csv(split_output, ("patient_id", "split"), split_rows)
+    # A pre-existing split was already validated above. Preserve its bytes:
+    # patch reuse fingerprints the CSV, and changing only CRLF to LF would
+    # otherwise reject an identical patient assignment.
+    if not split_output.is_file():
+        _write_csv(split_output, ("patient_id", "split"), split_rows)
     _write_csv(
         args.output / "source_manifest.csv",
         records[0].keys(),
@@ -278,7 +289,7 @@ def main() -> int:
     )
     payload = {
         "schema_version": 1,
-        "graph_policy": EXPECTED_CONFIGURATION,
+        "graph_policy": expected_configuration,
         "source_manifest": str(args.manifest.resolve()),
         "subjects": records,
         "counts": {

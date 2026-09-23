@@ -589,14 +589,17 @@ def _generate_patient(task: Mapping[str, object]) -> dict[str, object]:
             write_nifti(raw_destination, image_patch)
             write_nifti(segmentation_destination, segmentation_patch)
         else:
-            hardlink_patch(
-                reuse_patch_root / split / "raw" / raw_destination.name,
-                raw_destination,
-            )
-            hardlink_patch(
-                reuse_patch_root / split / "seg" / segmentation_destination.name,
-                segmentation_destination,
-            )
+            raw_source = reuse_patch_root / split / "raw" / raw_destination.name
+            seg_source = reuse_patch_root / split / "seg" / segmentation_destination.name
+            # Curated vessel datasets archive graph-free training triplets but
+            # retain the exhaustive grid index. They remain valid raw/seg
+            # sources for regenerating a different graph representation.
+            if split == "train" and not raw_source.is_file():
+                raw_source = reuse_patch_root / "excluded_train" / "raw" / raw_destination.name
+            if split == "train" and not seg_source.is_file():
+                seg_source = reuse_patch_root / "excluded_train" / "seg" / segmentation_destination.name
+            hardlink_patch(raw_source, raw_destination)
+            hardlink_patch(seg_source, segmentation_destination)
         write_vtp_graph(
             output / split / "vtp" / f"{sample_id}_graph.vtp",
             normalized_positions,
@@ -846,7 +849,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         reuse_configuration = json.loads(reuse_configuration_path.read_text())
         compatible_fields = (
-            "split_sha256",
             "patch_size",
             "pad",
             "crop_size",
@@ -864,6 +866,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "Reusable dataset is incompatible for hard-linking raw/seg patches; "
                 f"different fields: {mismatches}"
             )
+        # A dataset-local split CSV is a filtered copy of the original
+        # combined-cohort split, so its byte hash differs even when every
+        # patient assignment is identical. The patch-index check below
+        # validates each reused patient's actual split instead.
         reuse_rows_by_patient = {patient_id: [] for patient_id in sources}
         with (reuse_patch_root / "patch_index.csv").open(newline="") as handle:
             for row in csv.DictReader(handle):

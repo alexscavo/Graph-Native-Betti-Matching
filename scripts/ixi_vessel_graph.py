@@ -1056,60 +1056,27 @@ def extract_dense_centerline(
     *,
     spacing: Sequence[float] = (1.0, 1.0, 1.0),
     centerline_backend: str = "legacy",
+    affine: np.ndarray | None = None,
+    repair_minimum_chord_fraction: float = 0.95,
     **topology_options,
 ) -> DenseCenterline:
     """Extract topology once and retain every post-cleanup centerline sample.
 
-    ``legacy`` remains the production baseline. ``vedo`` is retained only as a
-    rejected experimental control: real IXI evidence showed substantially worse
-    cycle and graph complexity, so it must never be selected implicitly.
+    ``legacy`` is the original production baseline. ``vedo_original`` runs
+    the original Vedo extractor with explicit mask-compatible centerline repair.
     """
 
     options = dict(topology_options)
     options.pop("smooth_iterations", None)
     options.pop("smooth_alpha", None)
-    if centerline_backend == "vedo":
-        from scripts.vedo_centerline import extract_vedo_centerline
+    if centerline_backend == "vedo_original":
+        from scripts.vedo_original_backend import extract_original_vedo_centerline
 
-        minimum_component_nodes = int(options.pop("min_component_voxels", 7))
-        spur_length = int(options.pop("spur_length", 4))
-        max_artifact_self_loop = int(options.pop("max_artifact_self_loop", 4))
-        max_junction_extent_mm = float(options.pop("max_junction_extent_mm", 1.5))
-        refined = extract_vedo_centerline(
-            segmentation,
-            spacing=spacing,
-            minimum_component_nodes=minimum_component_nodes,
-            **options,
+        return extract_original_vedo_centerline(
+            segmentation, spacing=spacing, affine=affine,
+            minimum_chord_fraction=repair_minimum_chord_fraction,
         )
-        degrees = np.zeros(len(refined.positions), dtype=np.int64)
-        for left, right in refined.edges:
-            degrees[left] += 1
-            degrees[right] += 1
-        refined_graph = VesselGraph(
-            node_positions=refined.positions,
-            node_degrees=degrees,
-            edges=refined.edges,
-            centerlines=[refined.positions[np.asarray(edge)] for edge in refined.edges],
-            node_radii=refined.radii_mm,
-            skeleton_voxels=refined.raw_skeleton_voxels,
-            pruned_voxels=refined.removed_small_nodes,
-        )
-        graph = _extract_graph_topology_from_dense(
-            refined_graph,
-            np.asarray(spacing, dtype=np.float64),
-            spur_length=spur_length,
-            max_artifact_self_loop=max_artifact_self_loop,
-            max_junction_extent_mm=max_junction_extent_mm,
-        )
-        provenance = {
-            **refined.provenance,
-            "removed_triangle_edges": refined.removed_triangle_edges,
-            "removed_local_redundant_edges": refined.removed_local_redundant_edges,
-            "removed_invalid_edges": refined.removed_invalid_edges,
-            "orphan_candidates": refined.orphan_candidates,
-            "orphan_nodes_added": refined.orphan_nodes_added,
-        }
-    elif centerline_backend == "legacy":
+    if centerline_backend == "legacy":
         graph = build_vessel_graph(
             segmentation,
             spacing=spacing,
@@ -1331,6 +1298,8 @@ def build_representation_family(
     adaptive_tolerance_mm: float,
     adaptive_radius_fraction: float = 0.0,
     centerline_backend: str = "legacy",
+    affine: np.ndarray | None = None,
+    return_provenance: bool = False,
     enforce_lumen_containment: bool = True,
     minimum_chord_fraction: float = 1.0,
     simplification_method: str = "rdp",
@@ -1358,6 +1327,8 @@ def build_representation_family(
         segmentation,
         spacing=spacing,
         centerline_backend=centerline_backend,
+        affine=affine,
+        repair_minimum_chord_fraction=minimum_chord_fraction,
         **common,
     )
     derivation = dict(
@@ -1367,7 +1338,7 @@ def build_representation_family(
         minimum_chord_fraction=minimum_chord_fraction,
         simplification_method=simplification_method,
     )
-    return {
+    family = {
         "junction_only": derive_graph_from_dense(dense, "junction_only", **derivation),
         "adaptive": derive_graph_from_dense(
             dense,
@@ -1379,6 +1350,7 @@ def build_representation_family(
         ),
         "dense": dense.graph,
     }
+    return (family, dense.provenance) if return_provenance else family
 
 
 def _drop_small_components(

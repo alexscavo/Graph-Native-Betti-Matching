@@ -20,29 +20,26 @@ set -euo pipefail
 : "${REAL_PATCH_OUTPUT:?set REAL_PATCH_OUTPUT}"
 : "${REAL_PATCH_SPLIT:?set REAL_PATCH_SPLIT}"
 : "${REAL_PATCH_EVIDENCE:?set REAL_PATCH_EVIDENCE}"
+: "${REAL_PATCH_CENTERLINE_BACKEND:=legacy}"
+: "${REAL_PATCH_REUSE_PATCHES_FROM:=}"
 
 export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
 export MPLCONFIGDIR="${MPLCONFIGDIR:-${TMPDIR:-/tmp}/matplotlib-${SLURM_JOB_ID}}"
 mkdir -p "$MPLCONFIGDIR" "$REAL_PATCH_OUTPUT" "$REAL_PATCH_EVIDENCE"
 cd "$REAL_PATCH_REPO"
 
-echo "[1/3] validating and staging selected full-volume graphs for $REAL_PATCH_DATASET"
-srun --ntasks=1 --cpus-per-task=1 "$REAL_PATCH_PYTHON" -u scripts/prepare_real_graph_patch_sources.py \
+reuse_args=()
+if [ -n "$REAL_PATCH_REUSE_PATCHES_FROM" ]; then
+  reuse_args=(--reuse-patches-from "$REAL_PATCH_REUSE_PATCHES_FROM")
+fi
+
+echo "extracting $REAL_PATCH_DATASET patches from completed $REAL_PATCH_CENTERLINE_BACKEND graphs"
+srun --ntasks=1 --cpus-per-task="${SLURM_CPUS_PER_TASK}" "$REAL_PATCH_PYTHON" -u \
+  scripts/extract_vessel_patches.py \
   --manifest "$REAL_PATCH_MANIFEST" \
   --dataset-root "$REAL_PATCH_DATASET_ROOT" --dataset "$REAL_PATCH_DATASET" \
-  --output "$REAL_PATCH_SOURCES" \
-  --split-output "$REAL_PATCH_SPLIT"
-
-echo "[2/3] producing exact-boundary 64^3 patches"
-srun --ntasks=1 --cpus-per-task="${SLURM_CPUS_PER_TASK}" "$REAL_PATCH_PYTHON" -u \
-  scripts/generate_synthetic_mri_dataset.py \
-  --root "$REAL_PATCH_SOURCES" \
-  --output-dir "$REAL_PATCH_OUTPUT" \
-  --split-output "$REAL_PATCH_SPLIT" \
-  --patch-size 64 64 64 --pad 0 0 0 --maximum-stride 40 40 40 \
-  --workers "${SLURM_CPUS_PER_TASK}" --resume --allow-existing-split-proportions
-
-echo "[3/3] classifying empty and graph-positive vessel patches"
-srun --ntasks=1 --cpus-per-task=1 "$REAL_PATCH_PYTHON" -u scripts/audit_real_patch_eligibility.py \
-  --patch-root "$REAL_PATCH_OUTPUT" \
-  --output "$REAL_PATCH_EVIDENCE/$REAL_PATCH_DATASET"
+  --centerline-backend "$REAL_PATCH_CENTERLINE_BACKEND" \
+  --sources "$REAL_PATCH_SOURCES" --output "$REAL_PATCH_OUTPUT" \
+  --split-output "$REAL_PATCH_SPLIT" --evidence "$REAL_PATCH_EVIDENCE" \
+  "${reuse_args[@]}" \
+  --workers "${SLURM_CPUS_PER_TASK}"

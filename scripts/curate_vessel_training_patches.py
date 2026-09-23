@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Move graph-free training patches out of active split, retaining a reversible archive.
+"""Archive ineligible vessel patches while retaining the exhaustive grid index.
 
-Validation/test patches and the original exhaustive grid index are never changed.
-The generated training view records the exact exclusions and active train index.
+By default only training patches are curated for backwards compatibility.
+``--all-splits`` applies the same rule to validation and test patches.
 """
 
 from __future__ import annotations
@@ -39,17 +39,17 @@ def read_index(root: Path) -> tuple[list[dict], list[str], str]:
     return rows, fields, digest
 
 
-def excluded(row: dict) -> bool:
-    return row["split"] == "train" and (
+def excluded(row: dict, *, all_splits: bool) -> bool:
+    return (all_splits or row["split"] == "train") and (
         int(row["foreground_voxels"]) <= 0 or
         int(row["node_count"]) <= 0 or int(row["edge_count"]) <= 0
     )
 
 
-def triplets(root: Path, sample_id: str) -> tuple[tuple[Path, Path], ...]:
+def triplets(root: Path, split: str, sample_id: str) -> tuple[tuple[Path, Path], ...]:
     names = (f"{sample_id}_data.nii.gz", f"{sample_id}_seg.nii.gz", f"{sample_id}_graph.vtp")
     return tuple(
-        (root / "train" / part / name, root / "excluded_train" / part / name)
+        (root / split / part / name, root / f"excluded_{split}" / part / name)
         for part, name in zip(("raw", "seg", "vtp"), names)
     )
 
@@ -63,29 +63,34 @@ def write_csv_atomic(path: Path, fields: list[str], rows: list[dict]) -> None:
     os.replace(temporary, path)
 
 
-def curate(root: Path, *, apply: bool) -> dict:
+def curate(root: Path, *, apply: bool, all_splits: bool = False) -> dict:
     rows, fields, digest = read_index(root)
-    rejected = [row for row in rows if excluded(row)]
-    retained_train = [row for row in rows if row["split"] == "train" and not excluded(row)]
+    rejected = [row for row in rows if excluded(row, all_splits=all_splits)]
+    retained = [row for row in rows if not excluded(row, all_splits=all_splits)]
+    retained_train = [row for row in retained if row["split"] == "train"]
     reasons = Counter(
         "zero_foreground" if int(row["foreground_voxels"]) == 0 else "foreground_without_graph"
         for row in rejected
     )
     counts = dict(Counter(row["split"] for row in rows))
+    active_counts = dict(Counter(row["split"] for row in retained))
+    excluded_counts = dict(Counter(row["split"] for row in rejected))
     summary = {
         "schema_version": 1,
         "source_index_sha256": digest,
         "grid_patches_by_split": counts,
         "active_train_patches": len(retained_train),
-        "excluded_train_patches": len(rejected),
+        "excluded_train_patches": excluded_counts.get("train", 0),
+        "active_patches_by_split": active_counts,
+        "excluded_patches_by_split": excluded_counts,
         "excluded_reasons": dict(reasons),
-        "validation_test_unchanged": True,
-        "archive": str(root / "excluded_train"),
-        "note": "All excluded triplets are archived, not deleted. Original patch_index.csv remains the full-grid audit."
+        "validation_test_unchanged": not all_splits,
+        "archive": {split: str(root / f"excluded_{split}") for split in ("train", "val", "test") if all_splits or split == "train"},
+        "note": "Excluded triplets are archived, not deleted. Original patch_index.csv remains the full-grid audit."
     }
     moved = []
     for row in rejected:
-        for original, archive in triplets(root, row["sample_id"]):
+        for original, archive in triplets(root, row["split"], row["sample_id"]):
             if original.is_file() and not archive.exists():
                 moved.append((original, archive))
             elif not original.exists() and archive.is_file():
@@ -98,9 +103,7 @@ def curate(root: Path, *, apply: bool) -> dict:
     for original, archive in moved:
         archive.parent.mkdir(parents=True, exist_ok=True)
         os.replace(original, archive)
-    for row in rows:
-        if excluded(row):
-            continue
+    for row in retained:
         sample = row["sample_id"]
         for part, filename in (("raw", f"{sample}_data.nii.gz"),
                                ("seg", f"{sample}_seg.nii.gz"),
@@ -108,8 +111,11 @@ def curate(root: Path, *, apply: bool) -> dict:
             path = root / row["split"] / part / filename
             if not path.is_file():
                 raise FileNotFoundError(f"Retained patch missing: {path}")
-    write_csv_atomic(root / "excluded_train_index.csv", fields, rejected)
-    write_csv_atomic(root / "active_train_index.csv", fields, retained_train)
+    for split in (("train", "val", "test") if all_splits else ("train",)):
+        write_csv_atomic(root / f"excluded_{split}_index.csv", fields,
+                         [row for row in rejected if row["split"] == split])
+        write_csv_atomic(root / f"active_{split}_index.csv", fields,
+                         [row for row in retained if row["split"] == split])
     summary.pop("remaining_files_to_move")
     temporary = root / f".training_view.{os.getpid()}.tmp"
     temporary.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
@@ -121,9 +127,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--patch-root", type=Path, action="append", required=True)
     parser.add_argument("--apply", action="store_true", help="move only excluded training triplets")
+    parser.add_argument("--all-splits", action="store_true", help="apply the same eligibility rule to train, val and test")
     args = parser.parse_args()
     for root in args.patch_root:
-        print(json.dumps({"patch_root": str(root), **curate(root, apply=args.apply)}, indent=2), flush=True)
+        print(json.dumps({"patch_root": str(root), **curate(root, apply=args.apply, all_splits=args.all_splits)}, indent=2), flush=True)
 
 
 if __name__ == "__main__":

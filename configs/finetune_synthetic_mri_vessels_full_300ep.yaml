@@ -1,0 +1,50 @@
+defaults:
+  - finetune_synthetic_mri.yaml
+
+# Vessels-only (synthetic_mri target, no plants mixing), trained from random
+# initialization (no GNBM_INITIAL_WEIGHTS/--resume), on every discovered
+# patch in the boundary-corrected full dataset, for 300 epochs. Baseline
+# cross-entropy losses (base.yaml defaults) — no focal/curriculum overlay.
+# Point SYNTHETIC_MRI_DATASET at the boundary-corrected full patch root
+# before submitting, e.g.:
+#   export SYNTHETIC_MRI_DATASET=/lustre/fsn1/projects/rech/vnc/upz73jr/datasets/syntheticMRI/new_patches_boundary
+
+experiment:
+  name: finetune_vessels_full_300ep
+
+data:
+  # Per-GPU batch; global batch 32 on the planned 4-GPU launch.
+  batch_size: 8
+  validation_batch_size: 32
+  datasets:
+    synthetic_mri:
+      train_samples: null
+      validation_samples: null
+
+training:
+  epochs: 300
+  early_stopping:
+    enabled: true
+    monitor: edge_mAP
+    mode: max
+    patience_epochs: 50
+    min_epochs: 0
+    min_delta: 0.0
+  checkpoint:
+    policy: best_only
+    interval_epochs: 100
+    latest_interval_epochs: 2
+
+evaluation:
+  interval_epochs: 5
+  training_metrics:
+    enabled: true
+    save_f1_checkpoints: true
+    dataset: synthetic_mri
+    max_samples: null
+    selection_metric: edge_mAP
+    selection_mode: max
+    save_best_checkpoint: true
+
+tracking:
+  tags: [gnbm, full-data, mri-finetune, baseline, vessels-only, scratch-init]

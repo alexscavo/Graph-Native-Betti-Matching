@@ -22,7 +22,18 @@ class PatchPhysicalCoordinates:
         if patch_root not in self._datasets:
             with (patch_root / "generation_config.json").open() as stream:
                 generation = json.load(stream)
-            with (patch_root / "source_manifest.json").open() as stream:
+            manifest_path = patch_root / "source_manifest.json"
+            if not manifest_path.is_file():
+                source_root = generation.get("source_root")
+                if not source_root:
+                    raise FileNotFoundError(
+                        f"No source_manifest.json or source_root for {patch_root}"
+                    )
+                source_root = Path(source_root)
+                if not source_root.is_absolute():
+                    source_root = patch_root / source_root
+                manifest_path = source_root / "source_manifest.json"
+            with manifest_path.open() as stream:
                 manifest = json.load(stream)
             with (patch_root / "patch_index.csv").open(newline="") as stream:
                 index = {row["sample_id"]: row for row in csv.DictReader(stream)}

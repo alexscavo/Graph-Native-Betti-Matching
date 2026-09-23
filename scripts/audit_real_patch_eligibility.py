@@ -21,6 +21,7 @@ def audit(patch_roots: list[Path], output: Path, inspect_masks: bool = True) -> 
     output.mkdir(parents=True, exist_ok=True)
     counts: dict[str, Counter] = {}
     exceptions = []
+    graph_on_empty = []
     for root in patch_roots:
         dataset = root.parent.parent.name
         counts[dataset] = Counter()
@@ -30,7 +31,13 @@ def audit(patch_roots: list[Path], output: Path, inspect_masks: bool = True) -> 
                 nodes = int(row["node_count"])
                 edges = int(row["edge_count"])
                 if fg == 0 and (nodes or edges):
-                    raise ValueError(f"Graph overlaps an empty mask: {root} / {row['sample_id']}")
+                    # Preserve this geometry error in QC; the curator will
+                    # exclude the patch from every active split.
+                    graph_on_empty.append({
+                        "dataset": dataset, "sample_id": row["sample_id"],
+                        "split": row["split"], "patient_id": row["patient_id"],
+                        "node_count": nodes, "edge_count": edges,
+                    })
                 category = ("empty_mask" if fg == 0 else
                             "foreground_no_graph" if nodes == 0 or edges == 0 else
                             "graph_positive")
@@ -57,11 +64,18 @@ def audit(patch_roots: list[Path], output: Path, inspect_masks: bool = True) -> 
     combined = sum(counts.values(), Counter())
     payload = {"datasets": {name: dict(values) for name, values in counts.items()},
                "overall": dict(combined),
+               "graph_on_empty_mask_count": len(graph_on_empty),
+               "graph_on_empty_mask_examples": graph_on_empty[:20],
                "foreground_no_graph_interior_depth_at_least": {
                    str(depth): sum(item.get("max_interior_depth_voxels", -1) >= depth
                                    for item in exceptions) for depth in (1, 4, 8, 12)},
                "definition": "graph_positive requires foreground>0, nodes>0, and edges>0"}
     (output / "patch_eligibility.json").write_text(json.dumps(payload, indent=2) + "\n")
+    if graph_on_empty:
+        with (output / "graph_on_empty_mask.csv").open("w", newline="") as stream:
+            writer = csv.DictWriter(stream, fieldnames=list(graph_on_empty[0]), lineterminator="\n")
+            writer.writeheader()
+            writer.writerows(graph_on_empty)
     if exceptions:
         with (output / "foreground_without_graph.csv").open("w", newline="") as stream:
             writer = csv.DictWriter(stream, fieldnames=list(exceptions[0]), lineterminator="\n")

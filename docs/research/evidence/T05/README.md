@@ -69,7 +69,9 @@ extraction; it does **not** validate segmentation quality.
 - [0.25-mm IXI check](sampling_ixi_hh_0p25/volumes.csv),
   [0.25-mm TopBrain check](sampling_topbrain_ct_0p25/volumes.csv).
 
-The reproducible commands, from the repository root, are:
+The original study commands are retained below for provenance. The one-off
+research scripts used by these commands were removed during repository cleanup;
+the saved measurements and views above are the reviewable result.
 
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 .venv/bin/python scripts/study_full_volume_representations.py --max-per-stratum 6 --output docs/research/evidence/T05/stratified_30
@@ -79,8 +81,8 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 .venv/bin/python scripts/validate_t05_r
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 OPENBLAS_NUM_THREADS=1 .venv/bin/python -m pytest -q tests/test_full_volume_representation_study.py tests/test_representation_geometry.py tests/test_branch_evaluation.py
 ```
 
-The initial five-subject [`pilot/`](pilot/) is retained for provenance only;
-all decisions here use the 30-subject study. An earlier unbounded local
+The initial five-subject pilot was removed after the 30-subject study
+superseded it; all decisions here use the 30-subject study. An earlier unbounded local
 220-volume process terminated before writing a complete report, so its
 in-memory results are **not** evidence. No exhaustive 220-volume T05 claim is
 made or needed for the next metric-implementation step.

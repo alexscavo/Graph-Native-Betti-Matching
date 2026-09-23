@@ -2,9 +2,9 @@ defaults:
   - finetune_synthetic_mri.yaml
 
 # One dataset only: point SYNTHETIC_MRI_DATASET at
-# /lustre/fsn1/projects/rech/vnc/upz25mj/datasets/IXI/vascular_patches/optimal_radius_0p75x_c095.
-# The active train directory has graph-positive patches; val/test retain the
-# original exhaustive grid, including foreground-negative patches.
+# /lustre/fsn1/projects/rech/vnc/upz25mj/datasets/IXI/vascular_patches/optimal_radius_0p75x_c095_vedo_original.
+# All three materialized splits contain only graph-positive patches. The
+# exhaustive grid remains in patch_index.csv, outside this single-patch study.
 experiment:
   name: finetune_ixi_vessels_q256
 
@@ -22,7 +22,27 @@ model:
   decoder:
     object_queries: 256
 
+training:
+  epochs: 100
+  checkpoint:
+    # Avoid 20 large epoch snapshots; retain best validation, best Branch F1,
+    # and a replace-in-place resume checkpoint every two epochs.
+    policy: best_only
+    latest_interval_epochs: 2
+
 evaluation:
+  interval_epochs: 10
+  training_metrics:
+    enabled: true
+    dataset: synthetic_mri
+    # Score every validation patch at each evaluation epoch; do not pick only
+    # the first subjects as a monitoring subset.
+    max_samples: null
+    selection_metric: branch_f1
+    selection_mode: max
+    save_best_checkpoint: true
   protocol:
     # Source-volume NIfTI affine + recorded crop origin; patch headers are identity.
     branch_threshold_mm: 1.0
+    # A 40-detection cap would make AP/AR recall impossible on denser IXI crops.
+    max_detections: 256

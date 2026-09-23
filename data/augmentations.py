@@ -138,8 +138,9 @@ def assert_valid_coordinates(
     volume_shape: Sequence[int],
     *,
     atol: float = 1.0e-6,
+    allow_patch_faces: bool = False,
 ) -> None:
-    """Raise when nodes lie outside the canonical voxel-centre coordinate range."""
+    """Raise outside voxel centres, or outside voxel-cell faces when enabled."""
 
     _validate_nodes(nodes)
     if nodes.numel() == 0:
@@ -147,13 +148,21 @@ def assert_valid_coordinates(
     maxima = axis_max_coordinates(
         volume_shape, dtype=nodes.dtype, device=nodes.device
     )
+    minima = torch.zeros_like(maxima)
+    if allow_patch_faces:
+        half_voxel = 0.5 / torch.as_tensor(
+            volume_shape, dtype=nodes.dtype, device=nodes.device
+        )
+        minima -= half_voxel
+        maxima += half_voxel
     spatial = nodes[:, :3]
-    if bool((spatial < -atol).any()) or bool((spatial > maxima + atol).any()):
+    if bool((spatial < minima - atol).any()) or bool((spatial > maxima + atol).any()):
         mins = spatial.min(dim=0)[0].tolist()
         maxs = spatial.max(dim=0)[0].tolist()
         raise ValueError(
             "Graph nodes are outside the valid index/size range: "
-            f"min={mins}, max={maxs}, allowed_max={maxima.tolist()}"
+            f"min={mins}, max={maxs}, allowed_min={minima.tolist()}, "
+            f"allowed_max={maxima.tolist()}"
         )
 
 
@@ -223,6 +232,8 @@ def rotate_coordinates(
     nodes: torch.Tensor,
     quarter_turns: Sequence[int],
     volume_shape: Sequence[int],
+    *,
+    allow_patch_faces: bool = False,
 ) -> torch.Tensor:
     """Rotate graph nodes exactly as :func:`rotate_volume`.
 
@@ -231,7 +242,7 @@ def rotate_coordinates(
     """
 
     shape = _shape_tuple(volume_shape)
-    assert_valid_coordinates(nodes, shape)
+    assert_valid_coordinates(nodes, shape, allow_patch_faces=allow_patch_faces)
     turns = _normalize_quarter_turns(quarter_turns)
     voxel = denormalize_coordinates(nodes, shape)
     spatial = voxel[:, :3]
@@ -244,7 +255,7 @@ def rotate_coordinates(
     result = nodes.clone()
     shape_tensor = torch.as_tensor(shape, dtype=nodes.dtype, device=nodes.device)
     result[:, :3] = spatial / shape_tensor
-    assert_valid_coordinates(result, shape)
+    assert_valid_coordinates(result, shape, allow_patch_faces=allow_patch_faces)
     return result
 
 
@@ -297,13 +308,15 @@ def zoom_coordinates(
     nodes: torch.Tensor,
     zoom_factor: float,
     volume_shape: Sequence[int],
+    *,
+    allow_patch_faces: bool = False,
 ) -> torch.Tensor:
     """Scale graph nodes about the voxel-grid centre."""
 
     if zoom_factor <= 0:
         raise ValueError(f"zoom_factor must be positive, got {zoom_factor}")
     shape = _shape_tuple(volume_shape)
-    assert_valid_coordinates(nodes, shape)
+    assert_valid_coordinates(nodes, shape, allow_patch_faces=allow_patch_faces)
     voxel = denormalize_coordinates(nodes, shape)
     centre = torch.as_tensor(
         [(size - 1.0) / 2.0 for size in shape],
@@ -312,7 +325,7 @@ def zoom_coordinates(
     )
     voxel[:, :3] = (voxel[:, :3] - centre) * float(zoom_factor) + centre
     result = normalize_voxel_coordinates(voxel, shape)
-    assert_valid_coordinates(result, shape)
+    assert_valid_coordinates(result, shape, allow_patch_faces=allow_patch_faces)
     return result
 
 

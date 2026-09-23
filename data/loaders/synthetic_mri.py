@@ -169,13 +169,18 @@ class SyntheticMRIDataset(Dataset):
             shape_before_rotation = tuple(int(value) for value in image.shape[-3:])
             image = rotate_volume(image, turns)
             segmentation = rotate_volume(segmentation, turns)
-            nodes = rotate_coordinates(nodes, turns, shape_before_rotation)
+            nodes = rotate_coordinates(
+                nodes, turns, shape_before_rotation, allow_patch_faces=True
+            )
 
             if self.zoom_range is not None:
                 zoom_factor = self.rng.uniform(*self.zoom_range)
                 image = zoom_volume(image, zoom_factor, mode="bilinear")
                 segmentation = zoom_volume(segmentation, zoom_factor, mode="nearest")
-                nodes = zoom_coordinates(nodes, zoom_factor, segmentation.shape[-3:])
+                nodes = zoom_coordinates(
+                    nodes, zoom_factor, segmentation.shape[-3:],
+                    allow_patch_faces=True,
+                )
             image = self.intensity_transform(image)
 
         return (

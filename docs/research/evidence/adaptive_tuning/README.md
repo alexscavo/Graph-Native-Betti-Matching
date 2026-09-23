@@ -48,9 +48,8 @@ Radius-1.5× was initially selected. It improves on radius-2× with P95 edge
 maximum error 0.603 mm, length-weighted shortening 1.80%, and maximum error
 1.50 times the local median radius. None of 13,527 audited edges falls below
 95% lumen containment. It adds only about 1% more edges than radius-2×, while
-the observed patch maximum remains 186 nodes. Exact 64³ crop statistics are in
-`results_stage2_14/`, all-edge geometry evidence in `geometry_radius1p5_14/`,
-and two graph-only real-data viewers in `selected_radius1p5x/`.
+the observed patch maximum remains 186 nodes. The retained direct comparison
+to the selected policy is in [`selected_policy_comparison/`](selected_policy_comparison/).
 
 `overflow_14/` shows why patches exceed 120 nodes. The maximum topological plus
 exact-boundary requirement is only 81 nodes; degree-2 geometry nodes account
@@ -107,9 +106,9 @@ subset but is one reason the complete-dataset transfer check is still required.
 Evidence:
 
 - direct comparison: [`selected_policy_comparison/`](selected_policy_comparison/);
-- rejected 0.5× calibration: [`optimal_0p5_one/`](optimal_0p5_one/);
-- rejected 1×/1.25× summaries: [`results_optimal_14/`](results_optimal_14/)
-  and [`geometry_optimal_14/`](geometry_optimal_14/);
+- rejected alternatives and the earlier greedy baseline are summarized in
+  [`selected_policy_comparison/`](selected_policy_comparison/) and
+  [`results_optimal_14/`](results_optimal_14/);
 - optimal policy counts: [`results_optimal_0p75_14/`](results_optimal_0p75_14/);
 - all-edge geometry audit: [`geometry_optimal_0p75_14/`](geometry_optimal_0p75_14/);
 - exact-crop overflow decomposition: [`overflow_optimal_0p75_14/`](overflow_optimal_0p75_14/);

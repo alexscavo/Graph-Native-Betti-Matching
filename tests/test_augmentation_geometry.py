@@ -14,6 +14,7 @@ from data.augmentations import (
     AugmentationPolicy,
     add_gaussian_noise,
     apply_augmentation,
+    assert_valid_coordinates,
     coordinates_to_voxel_indices,
     degrees_to_quarter_turns,
     embed_2d_coordinates,
@@ -72,6 +73,25 @@ class CoordinateConventionTests(unittest.TestCase):
 
 
 class ExactGeometryTests(unittest.TestCase):
+    def test_patch_face_nodes_survive_rotation_and_zoom(self) -> None:
+        shape = (64, 64, 64)
+        faces = torch.tensor([[-0.5 / 64, .4, .5],
+                              [63.5 / 64, .6, .5]], dtype=torch.float32)
+        with self.assertRaises(ValueError):
+            assert_valid_coordinates(faces, shape)
+        assert_valid_coordinates(faces, shape, allow_patch_faces=True)
+        rotated = rotate_coordinates(
+            faces, (1, 2, 3), shape, allow_patch_faces=True
+        )
+        assert_valid_coordinates(rotated, shape, allow_patch_faces=True)
+        zoomed = zoom_coordinates(
+            rotated, .8, shape, allow_patch_faces=True
+        )
+        assert_valid_coordinates(zoomed, shape, allow_patch_faces=True)
+        outside = torch.tensor([[-.75 / 64, .4, .5]], dtype=torch.float32)
+        with self.assertRaises(ValueError):
+            assert_valid_coordinates(outside, shape, allow_patch_faces=True)
+
     def test_every_composed_rotation_keeps_landmark_and_node_aligned(self) -> None:
         shape = (7, 7, 7)
         image, segmentation, nodes = _landmark_sample(shape, (1, 3, 5))

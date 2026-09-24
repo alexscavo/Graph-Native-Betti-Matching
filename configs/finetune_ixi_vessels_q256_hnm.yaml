@@ -1,0 +1,17 @@
+defaults:
+  - finetune_ixi_vessels_q256.yaml
+
+# HNM-only ablation. Preserve the 9,999 matched-pair budget.
+experiment:
+  name: finetune_ixi_vessels_q256_hnm
+
+loss:
+  edge:
+    candidates:
+      include_unmatched: true
+      unmatched_object_threshold: 0.5
+      max_active_unmatched: 16
+      max_unmatched_pairs_per_graph: 128
+      unmatched_weight: 0.5
+      unmatched_warmup_epochs: 1
+      unmatched_ramp_epochs: 4

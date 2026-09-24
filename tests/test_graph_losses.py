@@ -99,6 +99,33 @@ class HungarianMatcherTests(unittest.TestCase):
 
 
 class GraphCriterionTests(unittest.TestCase):
+    def test_node_type_targets_and_gradients(self):
+        config = _config()
+        config["loss"]["enabled"].append("node_types")
+        config["model"]["node_type"]["enabled"] = True
+        criterion, _ = self._criterion(config)
+        tokens, predictions, targets = _batch()
+        type_logits = torch.zeros((1, 4, 4), requires_grad=True)
+        predictions["pred_node_types"] = type_logits
+        assignments = [(torch.tensor([0, 1, 2]), torch.tensor([0, 1, 2]))]
+        loss = criterion.loss_node_types(
+            type_logits, targets["nodes"], targets["edges"], assignments
+        )
+        self.assertAlmostEqual(float(loss), float(torch.log(torch.tensor(4.0))))
+        loss.backward()
+        self.assertGreater(float(type_logits.grad[0, :3].abs().sum()), 0.0)
+        self.assertEqual(float(type_logits.grad[0, 3].abs().sum()), 0.0)
+
+    def test_node_type_labels_include_isolated_and_junction(self):
+        config = _config()
+        criterion, _ = self._criterion(config)
+        logits = torch.zeros((1, 6, 4))
+        logits[0, torch.arange(6), torch.tensor([1, 3, 2, 1, 1, 0])] = 8.0
+        edges = [torch.tensor([[0, 1], [1, 2], [2, 3], [1, 4]])]
+        nodes = [torch.zeros((6, 3))]
+        assignments = [(torch.arange(6), torch.arange(6))]
+        self.assertLess(float(criterion.loss_node_types(logits, nodes, edges, assignments)), 0.01)
+
     def test_rejects_ground_truth_larger_than_object_query_capacity(self):
         config = _config()
         criterion, _ = self._criterion(config)

@@ -6,6 +6,7 @@ import torch
 from torch import nn
 
 from training.evaluation import infer_graphs
+from training.evaluation.inference import _soft_degree_filter
 
 
 class AsymmetricRelationHead(nn.Module):
@@ -16,6 +17,37 @@ class AsymmetricRelationHead(nn.Module):
 
 
 class InferenceTests(unittest.TestCase):
+    def test_soft_degree_preference_and_high_confidence_override(self):
+        pairs = torch.tensor([[0, 1], [1, 2], [0, 2]])
+        types = torch.tensor([[0.0, 1.0, 0.0, 0.0],
+                              [0.0, 0.0, 1.0, 0.0],
+                              [0.0, 1.0, 0.0, 0.0]])
+        logits = torch.tensor([[0.0, 6.0], [0.0, 5.0], [0.0, 4.0]])
+        selected = _soft_degree_filter(pairs, logits, types, 3.0, 0.0)
+        self.assertEqual(selected.tolist(), [True, True, False])
+        logits[2, 1] = 20.0
+        selected = _soft_degree_filter(pairs, logits, types, 3.0, 0.0)
+        self.assertEqual(int(selected.sum()), 3)
+
+    def test_node_type_degree_caps_reject_extra_edges(self):
+        class PositiveHead(nn.Module):
+            def forward(self, features):
+                return features.new_tensor([[0.0, 4.0]]).expand(len(features), -1)
+
+        tokens = torch.zeros((1, 3, 2))
+        predictions = {
+            "pred_logits": torch.tensor([[[0.0, 4.0]] * 3]),
+            "pred_nodes": torch.zeros((1, 3, 3)),
+            "pred_node_types": torch.tensor([[[0.0, 9.0, 0.0, 0.0],
+                                              [0.0, 0.0, 9.0, 0.0],
+                                              [0.0, 9.0, 0.0, 0.0]]]),
+        }
+        unrestricted = infer_graphs(tokens, predictions, PositiveHead(), object_queries=3, relation_tokens=0)[0]
+        capped = infer_graphs(tokens, predictions, PositiveHead(), object_queries=3, relation_tokens=0, node_type_degree_caps=True)[0]
+        self.assertEqual(len(unrestricted["edges"]), 3)
+        self.assertEqual(len(capped["edges"]), 2)
+        self.assertEqual(tuple(capped["node_type_scores"].shape), (3, 4))
+
     def _inputs(self):
         tokens = torch.tensor(
             [[[4.0, 1.0], [1.0, 5.0], [2.0, 3.0], [0.0, 0.0]]]

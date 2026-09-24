@@ -158,6 +158,26 @@ class GraphCriterion(nn.Module):
             predicted_count.float(), target_count, reduction="sum"
         ) / (logits.shape[0] * logits.shape[1])
 
+    def loss_node_types(self, logits, target_nodes, target_edges, assignments):
+        """Supervise patch-graph degree classes on Hungarian-matched queries."""
+        parts = []
+        labels = []
+        for batch, (source, target) in enumerate(assignments):
+            if not source.numel():
+                continue
+            count = len(target_nodes[batch])
+            degree = torch.zeros(count, device=logits.device, dtype=torch.long)
+            edges = torch.as_tensor(target_edges[batch], device=logits.device).long().reshape(-1, 2)
+            if edges.numel():
+                degree.scatter_add_(0, edges[:, 0], torch.ones_like(edges[:, 0]))
+                degree.scatter_add_(0, edges[:, 1], torch.ones_like(edges[:, 1]))
+            # 0=isolated, 1=patch terminal, 2=degree-2, 3=junction.
+            parts.append(logits[batch, source.to(logits.device)])
+            labels.append(degree.clamp(max=3)[target.to(logits.device)])
+        if not parts:
+            return logits.sum() * 0.0
+        return F.cross_entropy(torch.cat(parts), torch.cat(labels))
+
     def _matched_nodes(self, predicted_nodes, target_nodes, assignments):
         source_index = _source_indices(assignments, predicted_nodes.device)
         predicted = predicted_nodes[source_index]
@@ -496,6 +516,13 @@ class GraphCriterion(nn.Module):
                 tokens, predictions["pred_logits"], targets["edges"], assignments
             ),
         }
+        if "node_types" in self.enabled_losses:
+            if "pred_node_types" not in predictions:
+                raise ValueError("node_types loss requires model.node_type.enabled=true")
+            losses["node_types"] = self.loss_node_types(
+                predictions["pred_node_types"], targets["nodes"],
+                targets["edges"], assignments,
+            )
         topology_losses = self.loss_topology(tokens, targets["edges"], assignments)
         for name, value in topology_losses.items():
             configuration = self.topology[name]

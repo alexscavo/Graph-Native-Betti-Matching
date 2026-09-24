@@ -177,6 +177,9 @@ def validate_config(config: Mapping[str, Any]) -> None:
     except (KeyError, TypeError) as error:
         raise ConfigError("model encoder/decoder configuration is incomplete") from error
     _positive_int(model.get("num_classes"), "model.num_classes")
+    node_type = model.get("node_type", {})
+    if not isinstance(node_type, Mapping) or not isinstance(node_type.get("enabled", False), bool):
+        raise ConfigError("model.node_type.enabled must be a boolean")
     if encoder.get("type") != "se_resnet":
         raise ConfigError("model.encoder.type must be se_resnet")
     _positive_int(encoder.get("input_channels"), "model.encoder.input_channels")
@@ -436,6 +439,11 @@ def validate_config(config: Mapping[str, Any]) -> None:
         raise ConfigError("loss must be a mapping")
     if not isinstance(loss.get("supervise_target_graphs"), bool):
         raise ConfigError("loss.supervise_target_graphs must be a boolean")
+    if "node_types" in loss.get("enabled", []):
+        if not node_type.get("enabled", False):
+            raise ConfigError("node_types loss requires model.node_type.enabled=true")
+        if float(loss.get("weights", {}).get("node_types", 0)) <= 0:
+            raise ConfigError("loss.weights.node_types must be positive")
     try:
         node_classification = loss["node"]["classification"]
         edge = loss["edge"]
@@ -543,6 +551,20 @@ def validate_config(config: Mapping[str, Any]) -> None:
     evaluation = config.get("evaluation")
     if not isinstance(evaluation, Mapping):
         raise ConfigError("evaluation must be a mapping")
+    if not isinstance(evaluation.get("node_type_degree_caps", False), bool):
+        raise ConfigError("evaluation.node_type_degree_caps must be a boolean")
+    if evaluation.get("node_type_degree_caps", False) and not node_type.get("enabled", False):
+        raise ConfigError("node_type_degree_caps requires model.node_type.enabled=true")
+    try:
+        degree_penalty = float(evaluation.get("node_type_degree_penalty", 0.0))
+    except (TypeError, ValueError) as error:
+        raise ConfigError("evaluation.node_type_degree_penalty must be numeric") from error
+    if not 0.0 <= degree_penalty < float("inf"):
+        raise ConfigError("evaluation.node_type_degree_penalty must be finite and non-negative")
+    if degree_penalty and not node_type.get("enabled", False):
+        raise ConfigError("node_type_degree_penalty requires model.node_type.enabled=true")
+    if degree_penalty and evaluation.get("node_type_degree_caps", False):
+        raise ConfigError("hard and soft degree decoding cannot both be enabled")
     _positive_int(evaluation.get("interval_epochs"), "evaluation.interval_epochs")
     for name in ("node_threshold", "edge_threshold"):
         value = evaluation.get(name)

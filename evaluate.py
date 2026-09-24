@@ -45,6 +45,7 @@ def _parser():
     parser.add_argument("--device")
     parser.add_argument("--node-threshold", type=float)
     parser.add_argument("--edge-threshold", type=float)
+    parser.add_argument("--node-type-degree-penalty", type=float)
     parser.add_argument("--bn-calibration-batches", type=int)
     parser.add_argument("--visualizations", type=int, default=0)
     parser.add_argument("--no-export-predictions", action="store_true")
@@ -97,6 +98,8 @@ def main():
         config["evaluation"]["node_threshold"] = args.node_threshold
     if args.edge_threshold is not None:
         config["evaluation"]["edge_threshold"] = args.edge_threshold
+    if args.node_type_degree_penalty is not None:
+        config["evaluation"]["node_type_degree_penalty"] = args.node_type_degree_penalty
     if args.bn_calibration_batches is not None:
         config["evaluation"]["bn_calibration_batches"] = args.bn_calibration_batches
     validate_config(config)

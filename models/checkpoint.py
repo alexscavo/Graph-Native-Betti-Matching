@@ -120,12 +120,18 @@ def load_legacy_model_checkpoint(
     path: str | Path,
     *,
     map_location: str | torch.device = "cpu",
+    allow_missing_node_type_head: bool = False,
 ) -> CheckpointCompatibility:
     """Load all active tensors and reject silent active-model incompatibilities."""
 
     checkpoint = load_checkpoint_file(path, map_location=map_location)
     report = checkpoint_compatibility(model, checkpoint)
-    if not report.compatible:
+    allowed_missing = {"node_type_embed.weight", "node_type_embed.bias"} if allow_missing_node_type_head else set()
+    if (
+        set(report.missing) - allowed_missing
+        or report.unexpected
+        or report.shape_mismatches
+    ):
         raise RuntimeError(
             "Checkpoint is incompatible with the active model: "
             f"missing={report.missing}, unexpected={report.unexpected}, "
@@ -137,7 +143,7 @@ def load_legacy_model_checkpoint(
         for key, value in state.items()
         if not any(key.startswith(prefix) for prefix in _REMOVED_PREFIXES)
     }
-    model.load_state_dict(active_state, strict=True)
+    model.load_state_dict(active_state, strict=not bool(report.missing))
     return report
 
 

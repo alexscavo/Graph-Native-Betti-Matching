@@ -1,0 +1,24 @@
+defaults:
+  - finetune_ixi_vessels_q256.yaml
+
+# Experimental IXI-only topology run. This is not an evaluated improvement.
+experiment:
+  name: finetune_ixi_vessels_q256_types_hnm
+
+model:
+  node_type:
+    enabled: true
+
+loss:
+  enabled: [boxes, class, cardinality, nodes, edges, node_types]
+  weights:
+    node_types: 1.0
+  edge:
+    candidates:
+      include_unmatched: true
+      unmatched_object_threshold: 0.5
+      max_active_unmatched: 16
+      max_unmatched_pairs_per_graph: 128
+      unmatched_weight: 0.5
+      unmatched_warmup_epochs: 1
+      unmatched_ramp_epochs: 4

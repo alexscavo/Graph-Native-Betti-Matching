@@ -58,6 +58,8 @@ def _prediction_record(sample_id, source_sample_id, prediction, metrics):
         "node_boxes_center_size_dhw": _tensor_values(prediction["boxes"]),
         "node_scores": _tensor_values(prediction["node_scores"]),
         "query_ids": _tensor_values(prediction["query_ids"]),
+        **({"node_type_scores": _tensor_values(prediction["node_type_scores"])}
+           if "node_type_scores" in prediction else {}),
         "edges": _tensor_values(prediction["edges"]),
         "edge_scores": _tensor_values(prediction["edge_scores"]),
         "metrics": metrics,
@@ -143,6 +145,8 @@ def evaluate_model(
             relation_tokens=int(decoder["relation_tokens"]),
             node_threshold=evaluation.get("node_threshold"),
             edge_threshold=evaluation.get("edge_threshold"),
+            node_type_degree_caps=evaluation.get("node_type_degree_caps", False),
+            node_type_degree_penalty=evaluation.get("node_type_degree_penalty", 0.0),
         )
         for local_index, graph in enumerate(graphs):
             sample_id = "sample_{:06d}".format(sample_index)

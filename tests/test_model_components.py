@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import importlib.util
 from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -16,6 +17,7 @@ from models.checkpoint import (
     checkpoint_compatibility,
     extract_model_state,
     load_checkpoint_file,
+    load_legacy_model_checkpoint,
 )
 from models.deformable_transformer import DeformableTransformer
 from models.ops.modules import MSDeformAttn
@@ -39,6 +41,27 @@ def _baseline_config():
 
 
 class ModelConfigurationTests(unittest.TestCase):
+    def test_only_new_node_type_head_may_be_missing_at_initialization(self):
+        class TinyModel(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.class_embed = nn.Linear(2, 2)
+                self.node_type_embed = nn.Linear(2, 4)
+
+        model = TinyModel()
+        old_state = {key: value.clone() for key, value in model.state_dict().items()
+                     if not key.startswith("node_type_embed.")}
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "old.pt"
+            torch.save({"net": old_state}, path)
+            with self.assertRaisesRegex(RuntimeError, "missing"):
+                load_legacy_model_checkpoint(model, path)
+            report = load_legacy_model_checkpoint(
+                model, path, allow_missing_node_type_head=True
+            )
+        self.assertEqual(set(report.missing),
+                         {"node_type_embed.weight", "node_type_embed.bias"})
+
     def test_config_records_effective_legacy_architecture(self) -> None:
         config = _baseline_config()
         self.assertEqual(config["model"]["encoder"]["strides"], [1, 2, 2, 2])

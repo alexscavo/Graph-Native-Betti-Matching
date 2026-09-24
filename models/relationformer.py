@@ -69,6 +69,13 @@ class RelationFormer(nn.Module):
         self.query_embed = nn.Embedding(self.num_queries, hidden_dim)
         self.input_proj = nn.Conv3d(encoder.num_features, hidden_dim, kernel_size=1)
         self.class_embed = nn.Linear(hidden_dim, int(model["num_classes"]))
+        # Optional patch-graph degree class: isolated, terminal, degree-2, junction.
+        # Keep disabled for exact compatibility with existing checkpoints.
+        self.node_type_embed = (
+            nn.Linear(hidden_dim, 4)
+            if model.get("node_type", {}).get("enabled", False)
+            else None
+        )
         self.coord_embed = MLP(hidden_dim, hidden_dim, 6, 3)
         self.obj_token = object_queries
 
@@ -108,6 +115,8 @@ class RelationFormer(nn.Module):
             "pred_logits": self.class_embed(object_tokens),
             "pred_nodes": self.coord_embed(object_tokens).sigmoid(),
         }
+        if self.node_type_embed is not None:
+            predictions["pred_node_types"] = self.node_type_embed(object_tokens)
         return tokens, predictions, projected_features
 
 

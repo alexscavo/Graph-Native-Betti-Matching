@@ -63,6 +63,8 @@ augmentation:
 
 model:
   num_classes: 2
+  node_type:
+    enabled: false
   encoder:
     type: se_resnet
     input_channels: 1
@@ -130,6 +132,7 @@ loss:
     cardinality: 0.8
     nodes: 2.0
     edges: 6.0
+    node_types: 1.0
   node:
     classification:
       name: weighted_cross_entropy
@@ -188,6 +191,8 @@ evaluation:
   interval_epochs: 5
   node_threshold: null
   edge_threshold: null
+  node_type_degree_caps: false
+  node_type_degree_penalty: 0.0
   bn_calibration_batches: 0
   training_metrics:
     save_f1_checkpoints: false

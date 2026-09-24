@@ -43,7 +43,7 @@ def main() -> None:
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     with (args.output_dir / "soft_degree_sweep.csv").open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(records[0]))
+        writer = csv.DictWriter(handle, fieldnames=list(records[0]), lineterminator="\n")
         writer.writeheader()
         writer.writerows(records)
 

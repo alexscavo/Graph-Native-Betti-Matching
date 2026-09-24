@@ -46,17 +46,18 @@ if [[ -n "${GNBM_EVAL_DEGREE_PENALTIES:-}" ]]; then
       --output-dir "$GNBM_EVAL_OUTPUT/penalty_$penalty" \
       --node-type-degree-penalty "$penalty"
   done
-  if [[ -n "${GNBM_EVAL_EDGE_THRESHOLDS:-}" ]]; then
-    read -r -a edge_thresholds <<< "$GNBM_EVAL_EDGE_THRESHOLDS"
-    for threshold in "${edge_thresholds[@]}"; do
-      echo "plain edge threshold=$threshold"
-      "$GNBM_VENV/bin/python" -u "$repo_dir/evaluate.py" \
-        "${eval_args[@]}" \
-        --output-dir "$GNBM_EVAL_OUTPUT/edge_threshold_$threshold" \
-        --edge-threshold "$threshold"
-    done
-  fi
-else
+fi
+if [[ -n "${GNBM_EVAL_EDGE_THRESHOLDS:-}" ]]; then
+  read -r -a edge_thresholds <<< "$GNBM_EVAL_EDGE_THRESHOLDS"
+  for threshold in "${edge_thresholds[@]}"; do
+    echo "plain edge threshold=$threshold"
+    "$GNBM_VENV/bin/python" -u "$repo_dir/evaluate.py" \
+      "${eval_args[@]}" \
+      --output-dir "$GNBM_EVAL_OUTPUT/edge_threshold_$threshold" \
+      --edge-threshold "$threshold"
+  done
+fi
+if [[ -z "${GNBM_EVAL_DEGREE_PENALTIES:-}" && -z "${GNBM_EVAL_EDGE_THRESHOLDS:-}" ]]; then
   "$GNBM_VENV/bin/python" -u "$repo_dir/evaluate.py" \
     "${eval_args[@]}" --output-dir "$GNBM_EVAL_OUTPUT"
 fi

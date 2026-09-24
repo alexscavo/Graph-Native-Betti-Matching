@@ -49,10 +49,10 @@ must not be used to choose thresholds or variants.
 
 ## Status
 
-Focused CPU tests: 27 passed. Both pilot configurations passed dataset
-preflight with identical train and validation manifest hashes. Submitted
-one-H100, 90-minute development jobs: control `140955`, node types `141009`.
-At submission they were pending; no model-quality result is claimed yet.
+Focused CPU tests: 34 passed. Both pilot configurations passed dataset
+preflight with identical train and validation manifest hashes. The
+one-H100 development jobs, control `140955` and node types `141009`, both
+completed successfully.
 
 ## Completed 10-epoch warm-start comparison
 
@@ -98,3 +98,85 @@ for degree-aware pruning. See
 [confusion matrix](T10_node_type_results/node_type_confusion.png) and
 [counts](T10_node_type_results/node_type_accuracy.json). The type head is
 therefore not yet a reliable hard constraint; a soft test is appropriate.
+
+## Epoch-300 initializer check
+
+The epoch-270 initializer was selected only by a narrow original-run
+validation Branch F1 advantage (0.006756 versus 0.006657 at epoch 300).
+Four completed, matched 10-epoch IXI-only warm starts now test whether that
+choice changes the type-head conclusion. They use the same seeded 1,000
+training patches, all 2,961 validation patches, hyperparameters, and
+decoding threshold. The optional type head is randomly initialized in each
+type run; the control does not have it. No plants data or test patches enter.
+
+| Initializer / model | Pred. nodes | Pred. edges | Edge F1 | Branch F1 | Mean abs. beta-1 error |
+|---|---:|---:|---:|---:|---:|
+| Epoch 270 / control | 77.19 | 214.78 | 0.26725 | 0.00561 | 138.86 |
+| Epoch 270 / type loss | 74.81 | 211.08 | 0.26842 | 0.00587 | 137.51 |
+| Epoch 300 / control | 78.16 | 218.67 | 0.26494 | 0.00569 | 141.77 |
+| Epoch 300 / type loss | 76.87 | 214.49 | 0.26712 | 0.00560 | 138.87 |
+
+The same target has 52.43 edges/patch. Epoch 300 is not better in this
+matched pilot. Type supervision by itself makes only a small change from
+either initializer, and does not cure overconnection. The difference between
+270 and 300 is small; these short warm starts do not establish that 270 is a
+universally superior training checkpoint. Jobs `141926` and `141927`
+completed successfully.
+
+## Frozen epoch-270 type model: soft degree-aware decoding
+
+The frozen epoch-270-initialized type model was evaluated on the complete
+validation set. A *soft* degree penalty uses predicted patch-local type
+probabilities to lower the acceptance margin for edges that would exceed a
+likely terminal or degree-2 node's expected degree. It never imposes a hard
+cap. A plain edge-threshold sweep is the necessary non-type comparison:
+
+| Decoder | Pred. edges | Edge F1 | Branch F1 | Mean abs. beta-1 error |
+|---|---:|---:|---:|---:|
+| Original threshold (penalty 0) | 211.08 | 0.2684 | 0.00587 | 137.51 |
+| Plain threshold 0.65 | 125.33 | 0.3421 | 0.00536 | 56.30 |
+| Soft penalty 0.5 | 115.16 | 0.3611 | 0.00658 | 44.93 |
+| Soft penalty 1 | 76.82 | 0.4036 | 0.00395 | 13.25 |
+| Soft penalty 2 | 57.80 | 0.4101 | 0.00067 | 3.15 |
+
+The modest 0.5 penalty is promising: despite predicting slightly fewer
+edges than plain threshold 0.65, it has better edge F1 and Branch F1. This
+is evidence that type-based edge ordering may help, not proof that the
+classifier is well calibrated. Stronger penalties improve edge F1 and
+edge-count error but destroy branch continuity. Edge count or beta-1 error
+alone is an unsafe selection criterion. The threshold 0.65 and penalty 0.5
+points have similar, but not exactly matched, edge counts; a finer
+count-matched threshold or paired per-patch analysis would strengthen the
+claim.
+
+See the [complete sweep data](T10_node_type_results/soft_degree_sweep.csv),
+[metric plot](T10_node_type_results/soft_degree_sweep.png), and paired
+segmentation/graph views for [sample 38, penalty 0.5](T10_node_type_results/views/penalty_0.5/sample_000038_0076__sample_000616.html)
+and [sample 155, penalty 0.5](T10_node_type_results/views/penalty_0.5/sample_000155_0062__sample_002580.html).
+These two validation samples were selected by GT node-count stratum and
+seed, not by model performance. The HTML views synchronize the two cameras.
+
+## Epoch-300 soft-decoder replication
+
+The epoch-300-initialized type model's frozen checkpoint was evaluated with
+the same penalty 0, 0.5, and 1 settings, plus plain threshold 0.65, on the
+same complete validation split (job `142267`, completed):
+
+| Decoder | Epoch-270 edge F1 / Branch F1 | Epoch-300 edge F1 / Branch F1 | Epoch-300 pred. edges |
+|---|---:|---:|---:|
+| Original threshold | 0.2684 / 0.00587 | 0.2671 / 0.00560 | 214.49 |
+| Plain threshold 0.65 | 0.3421 / 0.00536 | 0.3405 / 0.00492 | 125.79 |
+| Soft penalty 0.5 | 0.3611 / 0.00658 | 0.3594 / 0.00597 | 116.98 |
+| Soft penalty 1 | 0.4036 / 0.00395 | 0.4031 / 0.00397 | 78.50 |
+
+The qualitative trade-off replicates: the 300 initializer is slightly worse
+at the modest penalty and does not change the conclusion. The type-aware
+decoder appears more useful than type supervision alone, but the remaining
+edge overcount (about 117 versus 52 target edges/patch at penalty 0.5) and
+very low Branch F1 mean this is not yet a satisfactory graph predictor.
+This is a validation-only comparison, not a held-out test result. See
+[epoch-300 sweep data](T10_node_type_results/from300/soft_degree_sweep.csv)
+and [plot](T10_node_type_results/from300/soft_degree_sweep.png). The same
+preselected validation example is available as an
+[interactive paired view](T10_node_type_results/from300/views/penalty_0.5/sample_000038_0076__sample_000616.html)
+and [PNG](T10_node_type_results/from300/views/penalty_0.5/sample_000038_0076__sample_000616.png).

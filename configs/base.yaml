@@ -28,6 +28,7 @@ data:
   train_augmentation: true
   mixed_sampling:
     balance_source_target: true
+    epoch_size: twice_source
   datasets: {}
 
 augmentation:
@@ -95,6 +96,16 @@ model:
     class_cost: 2.0
     node_cost: 5.0
 
+domain_adaptation:
+  enabled: false
+  image_adversarial: true
+  graph_adversarial: true
+  consistency_regularization: true
+  alpha_coefficient: 1.0
+  learning_rate: 7.0e-5
+  hidden_size: 2048
+  class_weights: [0.05, 0.95]
+
 training:
   input: image
   start_epoch: 0
@@ -133,6 +144,7 @@ loss:
     nodes: 2.0
     edges: 6.0
     node_types: 1.0
+    domain: 1.0
   node:
     classification:
       name: weighted_cross_entropy

@@ -80,7 +80,7 @@ class ConfigurationTests(unittest.TestCase):
             config["data"]["mixed_sampling"]["balance_source_target"]
         )
         self.assertTrue(config["loss"]["supervise_target_graphs"])
-        self.assertNotIn("domain_adaptation", config)
+        self.assertFalse(config["domain_adaptation"]["enabled"])
         self.assertIsNone(config["augmentation"]["synthetic_mri"]["intensity_clamp"])
         self.assertNotIn("domain_lr", config["training"]["optimizer"])
         self.assertEqual(

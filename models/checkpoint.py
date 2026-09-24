@@ -72,7 +72,7 @@ def checkpoint_compatibility(
         sorted(
             key
             for key in observed
-            if any(key.startswith(prefix) for prefix in _REMOVED_PREFIXES)
+            if key not in expected and any(key.startswith(prefix) for prefix in _REMOVED_PREFIXES)
         )
     )
     active_observed = {key: value for key, value in observed.items() if key not in ignored}
@@ -138,11 +138,7 @@ def load_legacy_model_checkpoint(
             f"shape_mismatches={report.shape_mismatches}"
         )
     state = extract_model_state(checkpoint)
-    active_state = {
-        key: value
-        for key, value in state.items()
-        if not any(key.startswith(prefix) for prefix in _REMOVED_PREFIXES)
-    }
+    active_state = {key: value for key, value in state.items() if key not in report.ignored_removed}
     model.load_state_dict(active_state, strict=not bool(report.missing))
     return report
 

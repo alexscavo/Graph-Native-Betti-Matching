@@ -11,8 +11,20 @@ def build_optimizer(config: Mapping, model):
     settings = config["training"]["optimizer"]
     if settings["name"] != "adamw":
         raise ValueError("only AdamW is supported")
+    parameters = [parameter for parameter in model.parameters() if parameter.requires_grad]
+    domain = config.get("domain_adaptation", {})
+    if domain.get("enabled", False):
+        domain_parameters = [
+            parameter for name, parameter in model.named_parameters()
+            if "domain_discriminator" in name and parameter.requires_grad
+        ]
+        domain_ids = {id(parameter) for parameter in domain_parameters}
+        parameters = [
+            {"params": [parameter for parameter in parameters if id(parameter) not in domain_ids]},
+            {"params": domain_parameters, "lr": float(domain["learning_rate"])},
+        ]
     return torch.optim.AdamW(
-        [parameter for parameter in model.parameters() if parameter.requires_grad],
+        parameters,
         lr=float(settings["base_lr"]),
         weight_decay=float(settings["weight_decay"]),
         eps=float(settings["epsilon"]),

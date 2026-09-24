@@ -84,6 +84,7 @@ def compose_source_target(
     target: Dataset,
     *,
     balance_source_target: bool,
+    epoch_size: str = "twice_source",
 ) -> Tuple[ConcatDataset, Optional[WeightedRandomSampler]]:
     """Concatenate source and target data and optionally equalize expected draws."""
 
@@ -92,6 +93,8 @@ def compose_source_target(
     dataset = ConcatDataset((source, target))
     if not balance_source_target:
         return dataset, None
+    if epoch_size not in {"twice_source", "combined"}:
+        raise ValueError("epoch_size must be twice_source or combined")
     target_weight = float(len(source)) / float(len(target))
     weights = torch.cat(
         (
@@ -101,7 +104,7 @@ def compose_source_target(
     )
     return dataset, WeightedRandomSampler(
         weights,
-        num_samples=2 * len(source),
+        num_samples=(2 * len(source) if epoch_size == "twice_source" else len(dataset)),
         replacement=True,
     )
 
@@ -236,6 +239,7 @@ def build_datasets(config: Mapping):
         balance_source_target=bool(
             config["data"]["mixed_sampling"]["balance_source_target"]
         ),
+        epoch_size=str(config["data"]["mixed_sampling"]["epoch_size"]),
     )
     validation_dataset = ConcatDataset(
         (source_validation_dataset, target_validation_dataset)

@@ -12,6 +12,7 @@ from .deformable_transformer import (
     DeformableTransformer,
     build_def_detr_transformer,
 )
+from .domain_adaptation import DomainDiscriminator
 from .position_encoding import PositionEmbeddingSine3D
 
 
@@ -81,9 +82,20 @@ class RelationFormer(nn.Module):
 
         relation_input_dim = hidden_dim * (2 + relation_tokens)
         self.relation_embed = MLP(relation_input_dim, hidden_dim, 2, 3)
+        self.domain_adaptation_enabled = bool(
+            config.get("domain_adaptation", {}).get("enabled", False)
+        )
+        if self.domain_adaptation_enabled:
+            domain_width = int(config["domain_adaptation"]["hidden_size"])
+            self.backbone_domain_discriminator = DomainDiscriminator(
+                hidden_dim, hidden_size=domain_width
+            )
+            self.instance_domain_discriminator = DomainDiscriminator(
+                hidden_dim * self.num_queries, hidden_size=domain_width
+            )
 
     def forward(
-        self, samples: torch.Tensor
+        self, samples: torch.Tensor, domain_alpha: float = 1.0
     ) -> tuple[torch.Tensor, dict[str, torch.Tensor], torch.Tensor]:
         """Return all tokens, node predictions, and projected encoder features.
 
@@ -117,6 +129,23 @@ class RelationFormer(nn.Module):
         }
         if self.node_type_embed is not None:
             predictions["pred_node_types"] = self.node_type_embed(object_tokens)
+        if self.domain_adaptation_enabled:
+            image_features = projected_features.permute(0, 2, 3, 4, 1).reshape(
+                -1, self.hidden_dim
+            )
+            instance_features = tokens.flatten(start_dim=1)
+            image_reversed, image_plain = self.backbone_domain_discriminator(
+                image_features, domain_alpha
+            )
+            instance_reversed, instance_plain = self.instance_domain_discriminator(
+                instance_features, domain_alpha
+            )
+            predictions.update(
+                domain_image_log_probs=image_reversed,
+                domain_image_plain_log_probs=image_plain,
+                domain_instance_log_probs=instance_reversed,
+                domain_instance_plain_log_probs=instance_plain,
+            )
         return tokens, predictions, projected_features
 
 

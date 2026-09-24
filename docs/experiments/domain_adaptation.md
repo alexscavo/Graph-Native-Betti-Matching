@@ -1,11 +1,11 @@
-# Archived domain-adaptation experiment
+# Opt-in domain-adaptation experiment
 
 ## Status
 
-Adversarial domain adaptation is not part of the active Graph-Native Betti
-Matching baseline. Its configuration, discriminator modules, gradient-reversal
-path, optimizer group, loss calculation, and tracking metric must remain
-absent unless a new controlled experiment explicitly reintroduces them.
+Adversarial domain adaptation remains **off by default** in Graph-Native Betti
+Matching. The controlled Plants-source/IXI-target experiment reintroduces it
+only in `configs/pretrain_plants_ixi_domain_types_50ep.yaml`. The IXI-only
+fine-tuning configuration disables it because it has no source/target mixture.
 
 Source and target labels remain in the model-facing batch. They describe dataset
 roles and may be used for sampling, filtering, and diagnostics; their presence
@@ -88,21 +88,27 @@ loss:
   supervise_target_graphs: true
 ```
 
-## Reactivation contract
+## Reactivation contract and current implementation
 
-If domain adaptation is tested again, it should be introduced as one explicit,
-self-contained configuration block:
+The experiment uses one explicit, self-contained configuration block. Its
+implemented field names are:
 
 ```yaml
 domain_adaptation:
   enabled: true
-  image_weight: 1.0
-  graph_weight: 1.0
-  consistency_weight: 1.0
-  loss_weight: 1.0
-  gradient_reversal_alpha: 1.0
+  image_adversarial: true
+  graph_adversarial: true
+  consistency_regularization: true
+  alpha_coefficient: 1.0
   learning_rate: 0.00007
+  hidden_size: 2048
   class_weights: [0.05, 0.95]
+
+loss:
+  enabled: [boxes, class, cardinality, nodes, edges, node_types, domain]
+  supervise_target_graphs: true
+  weights:
+    domain: 1.0
 ```
 
 `enabled: true` must have all of the following observable effects:
@@ -118,8 +124,17 @@ domain_adaptation:
 forward passes, add no optimizer group, and emit no domain-loss metric. The loss
 must never be enabled indirectly through an independent list of names.
 
-Before accepting a reimplementation, add tests that demonstrate non-zero
-gradients in both a discriminator and an encoder parameter, zero domain-related
-state when disabled, and checkpoint loading behavior with and without legacy
-discriminator keys. Compare at least image-only, graph-only, combined, and
-combined-with-consistency variants against the unchanged baseline.
+The implementation follows the Image-to-Graph-Vessel reference's two
+2048-wide discriminators, image-feature and flattened-decoder-token inputs,
+two-pass gradient reversal, weighted image/instance NLL, consistency MSE,
+logistic reversal schedule, and separate discriminator learning rate. The
+target is sampled with replacement at the reference's expected 50% rate,
+using a combined-dataset epoch length. Unlike the old committed baseline,
+`domain` is present in `loss.enabled`, so its weighted term is actually
+backpropagated. Both Plants and IXI graphs are supervised during pretraining.
+
+`tests/test_domain_adaptation.py` verifies discriminator and feature gradients,
+the optimized loss, disabled-state behavior, the sampler, and checkpoint
+compatibility. A controlled ablation of image-only, graph-only, combined, and
+combined-with-consistency remains future work; the current request is to
+reproduce the reference's combined objective in one mixed run.

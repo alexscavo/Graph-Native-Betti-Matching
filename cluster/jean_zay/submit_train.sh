@@ -61,11 +61,15 @@ echo "Running configuration and dataset preflight on the login node..."
   cd "$repo_dir"
   "$python_bin" cluster/jean_zay/preflight_training.py --config "$config"
 )
-if [[ -n "${GNBM_INITIAL_WEIGHTS:-}" && ! -f "$GNBM_INITIAL_WEIGHTS" ]]; then
+if [[ -n "${GNBM_DEPENDENCY:-}" && ! "$GNBM_DEPENDENCY" =~ ^afterok:[0-9]+(:[0-9]+)*$ ]]; then
+  echo "GNBM_DEPENDENCY must have the form afterok:JOB_ID[:JOB_ID...]" >&2
+  exit 2
+fi
+if [[ -n "${GNBM_INITIAL_WEIGHTS:-}" && ! -f "$GNBM_INITIAL_WEIGHTS" && -z "${GNBM_DEPENDENCY:-}" ]]; then
   echo "Initial checkpoint does not exist: $GNBM_INITIAL_WEIGHTS" >&2
   exit 2
 fi
-if [[ -n "${GNBM_RESUME_CHECKPOINT:-}" && ! -f "$GNBM_RESUME_CHECKPOINT" ]]; then
+if [[ -n "${GNBM_RESUME_CHECKPOINT:-}" && ! -f "$GNBM_RESUME_CHECKPOINT" && -z "${GNBM_DEPENDENCY:-}" ]]; then
   echo "Resume checkpoint does not exist: $GNBM_RESUME_CHECKPOINT" >&2
   exit 2
 fi
@@ -124,7 +128,12 @@ export GNBM_GPUS_PER_NODE="$gpus_per_node"
 log_dir="$WORK/logs/graph-native-betti-matching"
 mkdir -p "$log_dir" "$GNBM_OUTPUT_DIR"
 
+dependency_args=()
+if [[ -n "${GNBM_DEPENDENCY:-}" ]]; then
+  dependency_args+=(--dependency="$GNBM_DEPENDENCY")
+fi
 submission="$(sbatch \
+  "${dependency_args[@]}" \
   --chdir="$repo_dir" \
   --nodes="$nodes" \
   --ntasks="$nodes" \

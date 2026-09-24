@@ -1,0 +1,30 @@
+defaults:
+  - pretrain_plants_ixi_domain_types_50ep.yaml
+
+# Real-data, production-width discriminator smoke: four training batches and
+# a short mixed-domain validation pass; no large checkpoints or W&B upload.
+experiment:
+  name: pretrain_plants_ixi_domain_types_smoke
+
+data:
+  datasets:
+    plants:
+      train_samples: 16
+      validation_samples: 8
+    synthetic_mri:
+      train_samples: 16
+      validation_samples: 8
+
+training:
+  epochs: 1
+  checkpoint:
+    policy: none
+
+evaluation:
+  interval_epochs: 1
+  training_metrics:
+    enabled: false
+    save_best_checkpoint: false
+
+tracking:
+  enabled: false

@@ -101,6 +101,7 @@ class GraphCriterion(nn.Module):
         self.candidates = loss["edge"]["candidates"]
         self.balancing = loss["edge"]["balancing"]
         self.topology = config["topology"]
+        self.domain_adaptation = config.get("domain_adaptation", {})
         self.validation = bool(validation)
         self.epoch = 1
         self.progress_percent = 0.0
@@ -177,6 +178,32 @@ class GraphCriterion(nn.Module):
         if not parts:
             return logits.sum() * 0.0
         return F.cross_entropy(torch.cat(parts), torch.cat(labels))
+
+    def loss_domains(self, predictions, domains):
+        """Reference image/instance NLL plus prediction consistency."""
+        settings = self.domain_adaptation
+        domains = domains.long()
+        weights = torch.as_tensor(
+            settings["class_weights"], device=domains.device, dtype=torch.float32
+        )
+        losses = []
+        if settings["image_adversarial"]:
+            image = predictions["domain_image_log_probs"]
+            if image.shape[0] % len(domains):
+                raise ValueError("image domain predictions must divide into samples")
+            positions = image.shape[0] // len(domains)
+            image_labels = domains.repeat_interleave(positions)
+            losses.append(F.nll_loss(image, image_labels, weight=weights))
+        if settings["graph_adversarial"]:
+            instance = predictions["domain_instance_log_probs"]
+            losses.append(F.nll_loss(instance, domains, weight=weights))
+        if settings["consistency_regularization"]:
+            image_plain = predictions["domain_image_plain_log_probs"].reshape(
+                len(domains), -1, 2
+            )
+            instance_plain = predictions["domain_instance_plain_log_probs"]
+            losses.append(F.mse_loss(image_plain.mean(dim=1), instance_plain))
+        return torch.stack(losses).sum()
 
     def _matched_nodes(self, predicted_nodes, target_nodes, assignments):
         source_index = _source_indices(assignments, predicted_nodes.device)
@@ -523,6 +550,11 @@ class GraphCriterion(nn.Module):
                 predictions["pred_node_types"], targets["nodes"],
                 targets["edges"], assignments,
             )
+        if "domain" in self.enabled_losses:
+            if "domains" not in targets:
+                raise ValueError("domain loss requires batch domain labels")
+            losses["domain"] = self.loss_domains(predictions, targets["domains"])
+            losses["domain_weighted"] = losses["domain"] * self.weights["domain"]
         topology_losses = self.loss_topology(tokens, targets["edges"], assignments)
         for name, value in topology_losses.items():
             configuration = self.topology[name]

@@ -1,0 +1,25 @@
+{
+  "dataset": "Plants source + IXI vessel target",
+  "note": "The draw counts are sampler expectations, not an observed epoch histogram.",
+  "smoke_runs": {
+    "8": {
+      "batch_size_per_gpu": 8,
+      "epoch": 1,
+      "global_batch_size": 8,
+      "nominal_samples": 32.0,
+      "optimizer_steps_per_second": 0.4471647450859968,
+      "peak_allocated_gib": 9.45060920715332,
+      "samples_per_second": 3.5773179606879744,
+      "train_seconds": 8.945249025011435,
+      "world_size": 1
+    }
+  },
+  "unique_train_samples": {
+    "ixi": 8000,
+    "plants": 25900
+  },
+  "weighted_epoch_draws_expected": {
+    "ixi": 16950.0,
+    "plants": 16950.0
+  }
+}

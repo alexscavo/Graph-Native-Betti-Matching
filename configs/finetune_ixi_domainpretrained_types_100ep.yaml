@@ -1,0 +1,16 @@
+defaults:
+  - finetune_ixi_vessels_q256_types.yaml
+
+# Model-only initialize from the 50-epoch mixed checkpoint. Domain heads are
+# intentionally absent: vessel-only fine-tuning has just one domain.
+experiment:
+  name: finetune_ixi_domainpretrained_types_100ep
+
+training:
+  epochs: 100
+
+evaluation:
+  interval_epochs: 10
+
+tracking:
+  tags: [gnbm, ixi, vessels-only, domain-pretrained, node-types, q256, finetune-100]

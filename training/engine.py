@@ -47,6 +47,7 @@ def _move_graph_batch(batch, device, input_name, supervise_target_graphs):
         {
             "nodes": [nodes[index].to(device=device) for index in indices],
             "edges": [edges[index].to(device=device) for index in indices],
+            "domains": domains[keep],
         },
     )
 
@@ -78,8 +79,18 @@ def train_step(
     )
     model.train()
     optimizer.zero_grad()
-    tokens, predictions, _ = model(volumes)
+    if config.get("domain_adaptation", {}).get("enabled", False):
+        progress = float(iteration) / max(1, total_iterations)
+        alpha = float(config["domain_adaptation"]["alpha_coefficient"]) * (
+            2.0 / (1.0 + math.exp(-10.0 * progress)) - 1.0
+        )
+        tokens, predictions, _ = model(volumes, domain_alpha=alpha)
+    else:
+        alpha = None
+        tokens, predictions, _ = model(volumes)
     losses = criterion(tokens, predictions, targets)
+    if alpha is not None:
+        losses["domain_alpha"] = volumes.new_tensor(alpha)
     if not bool(torch.isfinite(losses["total"].detach()).item()):
         raise FloatingPointError("non-finite total training loss")
     losses["total"].backward()

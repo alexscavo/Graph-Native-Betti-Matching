@@ -340,6 +340,8 @@ def validate_config(config: Mapping[str, Any]) -> None:
         raise ConfigError(
             "data.mixed_sampling.balance_source_target must be a boolean"
         )
+    if mixed_sampling.get("epoch_size") not in {"twice_source", "combined"}:
+        raise ConfigError("data.mixed_sampling.epoch_size must be twice_source or combined")
 
     augmentation = config.get("augmentation")
     if not isinstance(augmentation, Mapping):
@@ -439,6 +441,47 @@ def validate_config(config: Mapping[str, Any]) -> None:
         raise ConfigError("loss must be a mapping")
     if not isinstance(loss.get("supervise_target_graphs"), bool):
         raise ConfigError("loss.supervise_target_graphs must be a boolean")
+    domain = config.get("domain_adaptation")
+    if not isinstance(domain, Mapping):
+        raise ConfigError("domain_adaptation must be a mapping")
+    for name in (
+        "enabled", "image_adversarial", "graph_adversarial",
+        "consistency_regularization",
+    ):
+        if not isinstance(domain.get(name), bool):
+            raise ConfigError(f"domain_adaptation.{name} must be a boolean")
+    for name in ("alpha_coefficient", "learning_rate"):
+        try:
+            value = float(domain.get(name))
+        except (TypeError, ValueError) as error:
+            raise ConfigError(f"domain_adaptation.{name} must be numeric") from error
+        if not math.isfinite(value) or value <= 0:
+            raise ConfigError(f"domain_adaptation.{name} must be finite and positive")
+    domain_weights = domain.get("class_weights")
+    _positive_int(domain.get("hidden_size"), "domain_adaptation.hidden_size")
+    try:
+        parsed_domain_weights = [float(value) for value in domain_weights]
+    except (TypeError, ValueError):
+        parsed_domain_weights = []
+    if len(parsed_domain_weights) != 2 or any(
+        not math.isfinite(value) or value <= 0 for value in parsed_domain_weights
+    ):
+        raise ConfigError("domain_adaptation.class_weights must contain two positive finite values")
+    if domain["enabled"]:
+        if "domain" not in loss.get("enabled", []):
+            raise ConfigError("enabled domain adaptation requires domain in loss.enabled")
+        if not any(settings["role"] == "source" for settings in datasets.values()):
+            raise ConfigError("domain adaptation requires a source and target dataset")
+        if not loss["supervise_target_graphs"]:
+            raise ConfigError("domain adaptation requires loss.supervise_target_graphs=true")
+        if not domain["image_adversarial"] or not domain["graph_adversarial"]:
+            raise ConfigError("reference domain adaptation requires both discriminators")
+        if not domain["consistency_regularization"]:
+            raise ConfigError("reference domain adaptation requires consistency regularization")
+        if float(loss.get("weights", {}).get("domain", 0.0)) <= 0:
+            raise ConfigError("loss.weights.domain must be positive")
+    elif "domain" in loss.get("enabled", []):
+        raise ConfigError("domain loss requires domain_adaptation.enabled=true")
     if "node_types" in loss.get("enabled", []):
         if not node_type.get("enabled", False):
             raise ConfigError("node_types loss requires model.node_type.enabled=true")

@@ -1,0 +1,59 @@
+defaults:
+  - pretrain_mixed.yaml
+
+# Plants source + IXI vessel target. Reference domain objective is active;
+# weighted replacement sampling gives each domain 50% expected draws while
+# retaining the reference combined-dataset epoch length.
+experiment:
+  name: pretrain_plants_ixi_domain_types_50ep
+
+data:
+  batch_size: 32
+  mixed_sampling:
+    balance_source_target: true
+    epoch_size: combined
+  datasets:
+    synthetic_mri:
+      train_samples: 8000
+      validation_samples: null
+      patch_selection: all
+      sample_cap_selection: seeded_random
+      sample_cap_seed: 364505
+
+model:
+  decoder:
+    object_queries: 256
+  node_type:
+    enabled: true
+
+domain_adaptation:
+  enabled: true
+
+loss:
+  enabled: [boxes, class, cardinality, nodes, edges, node_types, domain]
+  supervise_target_graphs: true
+  weights:
+    node_types: 1.0
+    domain: 1.0
+
+training:
+  epochs: 50
+  checkpoint:
+    policy: best_only
+    latest_interval_epochs: 2
+
+evaluation:
+  interval_epochs: 5
+  training_metrics:
+    enabled: true
+    dataset: synthetic_mri
+    max_samples: null
+    selection_metric: branch_f1
+    selection_mode: max
+    save_best_checkpoint: true
+  protocol:
+    max_detections: 256
+    branch_threshold_mm: 1.0
+
+tracking:
+  tags: [gnbm, plants, ixi, mixed, domain-adaptation, node-types, q256, pretrain-50]

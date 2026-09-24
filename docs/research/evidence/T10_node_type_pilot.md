@@ -180,3 +180,28 @@ and [plot](T10_node_type_results/from300/soft_degree_sweep.png). The same
 preselected validation example is available as an
 [interactive paired view](T10_node_type_results/from300/views/penalty_0.5/sample_000038_0076__sample_000616.html)
 and [PNG](T10_node_type_results/from300/views/penalty_0.5/sample_000038_0076__sample_000616.png).
+
+## Full 300-epoch node-type run (submitted)
+
+`configs/finetune_ixi_vessels_q256_types_300ep.yaml` starts a new IXI-only
+model **from random initialization**, with 256 object queries, 8,000 seeded
+training patches, all 2,961 validation patches, 300 epochs, and the
+four-class patch-degree loss weighted 1.0. Hard-negative mining is off.
+Training-time evaluation uses the ordinary decoder (`penalty=0`) so one
+trained checkpoint can be compared fairly under multiple decoding choices.
+Preflight passed and confirmed the original training and validation manifest
+hashes (`d3baea4df7b30fbf` and `c65e7f3e5ea9bee0`).
+
+- Training job `145201`: two H100s, `qos_gpu_h100-t3`, 12-hour limit,
+  Scratch run `ixi_q256_types_300ep_20260924`, offline W&B, replace-in-place
+  full-state checkpoint every two epochs, automatic resume on resubmission.
+- Dependent validation job `145239`: after successful training, score the
+  epoch-300 latest checkpoint on every validation patch with penalties
+  `0`, `0.5`, and `1`, plus plain edge threshold `0.65`. It does not use the
+  test split. Results will be under the run's `validation_decoder_sweep/`.
+
+This is a continuous 300-epoch polynomial LR schedule; the previous
+IXI-only baseline used a 100-epoch run followed by a 200-epoch continuation
+with an LR rebase. Thus comparisons to that historical baseline are useful
+but **not an exact single-variable training ablation**. The matched
+10-epoch warm starts above isolate the node-type head more tightly.

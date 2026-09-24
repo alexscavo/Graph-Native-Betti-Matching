@@ -1,0 +1,18 @@
+defaults:
+  - finetune_ixi_vessels_q256_types.yaml
+
+# IXI-only, 300-epoch node-type ablation from random initialization.
+# Match the original 8,000-patch, 256-query baseline; keep soft decoding off
+# during training so penalties 0, 0.5 and 1 can be compared on one checkpoint.
+experiment:
+  name: ixi_q256_types_300ep
+
+training:
+  epochs: 300
+
+evaluation:
+  interval_epochs: 10
+  node_type_degree_penalty: 0.0
+
+tracking:
+  tags: [gnbm, ixi, vessels-only, node-types, q256, scratch-init, 300ep]

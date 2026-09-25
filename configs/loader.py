@@ -489,22 +489,31 @@ def validate_config(config: Mapping[str, Any]) -> None:
             raise ConfigError("loss.weights.node_types must be positive")
     try:
         node_classification = loss["node"]["classification"]
+        node_type_classification = loss["node_type"]["classification"]
         edge = loss["edge"]
         classification_name = edge["classification"]["name"]
         candidates = edge["candidates"]
         balancing = edge["balancing"]
     except (KeyError, TypeError) as error:
         raise ConfigError("loss.edge configuration is incomplete") from error
-    for location, classification, allowed in (
+    for location, classification, allowed, expected_classes in (
         (
             "loss.node.classification",
             node_classification,
             {"weighted_cross_entropy", "focal"},
+            2,
         ),
         (
             "loss.edge.classification",
             edge["classification"],
             {"cross_entropy", "focal"},
+            2,
+        ),
+        (
+            "loss.node_type.classification",
+            node_type_classification,
+            {"cross_entropy", "weighted_cross_entropy", "focal"},
+            4,
         ),
     ):
         if classification.get("name") not in allowed:
@@ -514,11 +523,14 @@ def validate_config(config: Mapping[str, Any]) -> None:
         class_weights = classification.get("class_weights")
         if (
             not isinstance(class_weights, list)
-            or len(class_weights) != 2
+            or len(class_weights) != expected_classes
             or any(float(value) < 0 for value in class_weights)
             or sum(float(value) for value in class_weights) <= 0
         ):
-            raise ConfigError(f"{location}.class_weights must contain two non-negative values with a positive sum")
+            raise ConfigError(
+                f"{location}.class_weights must contain {expected_classes} "
+                "non-negative values with a positive sum"
+            )
         if float(classification.get("focal_gamma", -1)) < 0:
             raise ConfigError(f"{location}.focal_gamma must be non-negative")
         curriculum = classification.get("curriculum")

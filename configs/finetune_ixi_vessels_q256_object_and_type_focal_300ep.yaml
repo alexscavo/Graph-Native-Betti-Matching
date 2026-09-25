@@ -1,0 +1,20 @@
+defaults:
+  - finetune_ixi_vessels_q256_types_300ep.yaml
+
+# Matched IXI-only ablation: focal object/no-object and four-class node-type
+# losses; edge classification remains cross-entropy.
+experiment:
+  name: ixi_q256_object_and_type_focal_300ep
+
+loss:
+  node:
+    classification:
+      name: focal
+      focal_gamma: 2.0
+  node_type:
+    classification:
+      name: focal
+      focal_gamma: 2.0
+
+tracking:
+  tags: [gnbm, ixi, object-focal, node-type-focal, q256, scratch-init, 300ep]

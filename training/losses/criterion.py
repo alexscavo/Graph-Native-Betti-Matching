@@ -97,6 +97,7 @@ class GraphCriterion(nn.Module):
         self.enabled_losses = tuple(loss["enabled"])
         self.weights = {key: float(value) for key, value in loss["weights"].items()}
         self.node_config = loss["node"]["classification"]
+        self.node_type_config = loss["node_type"]["classification"]
         self.edge_config = loss["edge"]["classification"]
         self.candidates = loss["edge"]["candidates"]
         self.balancing = loss["edge"]["balancing"]
@@ -177,7 +178,9 @@ class GraphCriterion(nn.Module):
             labels.append(degree.clamp(max=3)[target.to(logits.device)])
         if not parts:
             return logits.sum() * 0.0
-        return F.cross_entropy(torch.cat(parts), torch.cat(labels))
+        return self._classification_loss(
+            torch.cat(parts), torch.cat(labels), self.node_type_config
+        )
 
     def loss_domains(self, predictions, domains):
         """Reference image/instance NLL plus prediction consistency."""

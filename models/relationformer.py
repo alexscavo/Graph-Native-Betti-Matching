@@ -72,11 +72,13 @@ class RelationFormer(nn.Module):
         self.class_embed = nn.Linear(hidden_dim, int(model["num_classes"]))
         # Optional patch-graph degree class: isolated, terminal, degree-2, junction.
         # Keep disabled for exact compatibility with existing checkpoints.
-        self.node_type_embed = (
-            nn.Linear(hidden_dim, 4)
-            if model.get("node_type", {}).get("enabled", False)
-            else None
-        )
+        # Keep subsequent shared-parameter initialization identical for the
+        # matched with/without-node-type ablation under the same random seed.
+        if model.get("node_type", {}).get("enabled", False):
+            with torch.random.fork_rng(devices=[]):
+                self.node_type_embed = nn.Linear(hidden_dim, 4)
+        else:
+            self.node_type_embed = None
         self.coord_embed = MLP(hidden_dim, hidden_dim, 6, 3)
         self.obj_token = object_queries
 

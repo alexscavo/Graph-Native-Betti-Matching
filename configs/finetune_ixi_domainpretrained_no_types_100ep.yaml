@@ -1,0 +1,16 @@
+defaults:
+  - finetune_ixi_domainpretrained_types_100ep.yaml
+
+# Matched control: initialize from the no-type mixed pretraining checkpoint.
+experiment:
+  name: finetune_ixi_domainpretrained_no_types_100ep
+
+model:
+  node_type:
+    enabled: false
+
+loss:
+  enabled: [boxes, class, cardinality, nodes, edges]
+
+tracking:
+  tags: [gnbm, ixi, vessels-only, domain-pretrained, no-node-types, q256, finetune-100]

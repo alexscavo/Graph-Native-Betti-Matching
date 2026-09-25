@@ -35,6 +35,62 @@ def _config():
 
 
 class DomainAdaptationTests(unittest.TestCase):
+    def test_node_type_ablation_configs_match_except_head_and_loss(self):
+        root = Path(__file__).resolve().parents[1]
+        environment = {
+            "GNBM_OUTPUT_DIR": "/outputs",
+            "PLANTS_DATASET": "/plants",
+            "SYNTHETIC_MRI_DATASET": "/ixi",
+        }
+        pairs = (
+            ("pretrain_plants_ixi_domain_types_50ep.yaml",
+             "pretrain_plants_ixi_domain_no_types_50ep.yaml"),
+            ("finetune_ixi_domainpretrained_types_100ep.yaml",
+             "finetune_ixi_domainpretrained_no_types_100ep.yaml"),
+        )
+        for with_head_name, without_head_name in pairs:
+            with self.subTest(pair=with_head_name):
+                with_head = load_config(root / "configs" / with_head_name,
+                                        environment=environment)
+                without_head = load_config(root / "configs" / without_head_name,
+                                           environment=environment)
+                validate_config(with_head)
+                validate_config(without_head)
+                self.assertTrue(with_head["model"]["node_type"]["enabled"])
+                self.assertFalse(without_head["model"]["node_type"]["enabled"])
+                self.assertIn("node_types", with_head["loss"]["enabled"])
+                self.assertNotIn("node_types", without_head["loss"]["enabled"])
+                with_head["model"]["node_type"]["enabled"] = False
+                with_head["loss"]["enabled"].remove("node_types")
+                for config in (with_head, without_head):
+                    config["experiment"]["name"] = None
+                    config["tracking"]["tags"] = []
+                self.assertEqual(with_head, without_head)
+
+    def test_shared_initialization_matches_with_or_without_type_head(self):
+        class Encoder(nn.Module):
+            num_features = 48
+
+            def forward(self, volumes):
+                return volumes
+
+        class Decoder(nn.Module):
+            def forward(self, projected, mask, queries, positions):
+                return projected.mean(dim=(2, 3, 4))[:, None, :] + queries[None]
+
+        def make_model(enabled):
+            config = _config()
+            config["model"]["decoder"]["hidden_dim"] = 48
+            config["domain_adaptation"]["hidden_size"] = 16
+            config["model"]["node_type"]["enabled"] = enabled
+            torch.manual_seed(1729)
+            return RelationFormer(Encoder(), Decoder(), config)
+
+        with_head = make_model(True).state_dict()
+        without_head = make_model(False).state_dict()
+        for name, value in without_head.items():
+            self.assertTrue(torch.equal(value, with_head[name]), name)
+
     def test_model_emits_both_reference_domain_predictions(self):
         config = _config()
         config["model"]["decoder"]["hidden_dim"] = 48

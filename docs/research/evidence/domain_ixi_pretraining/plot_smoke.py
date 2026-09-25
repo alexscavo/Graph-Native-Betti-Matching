@@ -41,7 +41,10 @@ def main():
             "ixi": epoch_draws / 2,
         },
         "smoke_runs": measured,
-        "note": "The draw counts are sampler expectations, not an observed epoch histogram.",
+        "note": (
+            "Draw counts are sampler expectations. Smoke throughput is a short-run "
+            "measurement, not a reliable full-epoch speed estimate."
+        ),
     }
     HERE.mkdir(parents=True, exist_ok=True)
     (HERE / "smoke_summary.json").write_text(
@@ -68,7 +71,7 @@ def main():
         memory = [measured[size]["peak_allocated_gib"] for size in batches]
         axes[1].bar(labels, throughput, color="#00897b")
         axes[1].set_ylabel("Measured samples / second / GPU")
-        axes[1].set_title("One-H100 smoke runs")
+        axes[1].set_title("One-H100 short smoke runs")
         for index, (speed, gib) in enumerate(zip(throughput, memory)):
             axes[1].text(index, speed, f"{speed:.1f}/s\n{gib:.1f} GiB",
                          ha="center", va="bottom", fontsize=8)

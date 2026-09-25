@@ -1,0 +1,16 @@
+defaults:
+  - pretrain_plants_ixi_domain_types_50ep.yaml
+
+# Matched control: only remove the degree-type prediction head and its loss.
+experiment:
+  name: pretrain_plants_ixi_domain_no_types_50ep
+
+model:
+  node_type:
+    enabled: false
+
+loss:
+  enabled: [boxes, class, cardinality, nodes, edges, domain]
+
+tracking:
+  tags: [gnbm, plants, ixi, mixed, domain-adaptation, no-node-types, q256, pretrain-50]

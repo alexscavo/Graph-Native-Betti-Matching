@@ -10,12 +10,44 @@
       "plain": 0.5102827718563523
     },
     {
+      "delta": 0.0,
+      "improvement_direction": "increase",
+      "label": "Node mAP",
+      "metric": "node_mAP",
+      "penalty_0p5": 0.0984451230095185,
+      "plain": 0.0984451230095185
+    },
+    {
+      "delta": 0.0,
+      "improvement_direction": "increase",
+      "label": "Node mAR",
+      "metric": "node_mAR",
+      "penalty_0p5": 0.22623426599979432,
+      "plain": 0.22623426599979432
+    },
+    {
       "delta": 0.09529695703638891,
       "improvement_direction": "increase",
       "label": "Edge F1",
       "metric": "edge_f1",
       "penalty_0p5": 0.4846832378532563,
       "plain": 0.3893862808168674
+    },
+    {
+      "delta": -0.00746695683207739,
+      "improvement_direction": "increase",
+      "label": "Edge mAP",
+      "metric": "edge_mAP",
+      "penalty_0p5": 0.09367751688989376,
+      "plain": 0.10114447372197115
+    },
+    {
+      "delta": -0.035255337314622714,
+      "improvement_direction": "increase",
+      "label": "Edge mAR",
+      "metric": "edge_mAR",
+      "penalty_0p5": 0.2612660744120309,
+      "plain": 0.29652141172665364
     },
     {
       "delta": 0.1166824389724117,

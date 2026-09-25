@@ -19,7 +19,11 @@ PENALTY = ROOT / "test_degree_penalty/penalty_0.5/summary.json"
 
 METRICS = (
     ("node_f1", "Node F1", False),
+    ("node_mAP", "Node mAP", False),
+    ("node_mAR", "Node mAR", False),
     ("edge_f1", "Edge F1", False),
+    ("edge_mAP", "Edge mAP", False),
+    ("edge_mAR", "Edge mAR", False),
     ("edge_precision", "Edge precision", False),
     ("edge_recall", "Edge recall", False),
     ("branch_f1", "Branch F1", False),

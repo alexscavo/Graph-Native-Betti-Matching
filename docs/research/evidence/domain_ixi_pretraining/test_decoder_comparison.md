@@ -6,7 +6,11 @@ patches, and identical thresholds. Only `node_type_degree_penalty` changes.
 | Metric | Plain | Penalty 0.5 | Change |
 |---|---:|---:|---:|
 | Node F1 | 0.5103 | 0.5103 | 0 |
+| Node mAP | 0.0984 | 0.0984 | 0 |
+| Node mAR | 0.2262 | 0.2262 | 0 |
 | Edge F1 | 0.3894 | **0.4847** | **+0.0953** |
+| Edge mAP | **0.1011** | 0.0937 | −0.0075 |
+| Edge mAR | **0.2965** | 0.2613 | −0.0353 |
 | Edge precision | 0.2620 | **0.3786** | **+0.1167** |
 | Edge recall | 0.7582 | 0.6732 | −0.0850 |
 | Branch F1 | 0.00887 | **0.01008** | **+0.00121** |

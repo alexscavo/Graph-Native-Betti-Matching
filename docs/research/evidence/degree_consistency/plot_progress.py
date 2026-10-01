@@ -36,12 +36,14 @@ def main() -> None:
     last_epoch = max(row["epoch"] for row in candidate)
     baseline = [row for row in baseline if row["epoch"] <= last_epoch]
 
-    fig, axes = plt.subplots(2, 3, figsize=(14, 7), constrained_layout=True)
+    fig, axes = plt.subplots(2, 4, figsize=(18, 7), constrained_layout=True)
     panels = (
         ("node_f1", "Node F1", None),
         ("edge_f1", "Edge F1", None),
+        ("branch_f1", "Branch F1", None),
         ("predicted_nodes", "Predicted nodes / patch", "target_nodes"),
         ("predicted_edges", "Predicted edges / patch", "target_edges"),
+        ("predicted_beta0", "Components β₀ / patch", "target_beta0"),
         ("predicted_beta1", "Predicted cycles β₁ / patch", "target_beta1"),
     )
     for ax, (key, title, target) in zip(axes.flat, panels):
@@ -65,7 +67,7 @@ def main() -> None:
     ax.legend(fontsize=8)
     ax.grid(alpha=0.25)
     axes.flat[0].legend(fontsize=8)
-    axes.flat[2].legend(fontsize=8)
+    axes.flat[3].legend(fontsize=8)
     fig.suptitle(
         f"IXI validation, 2,961 patches · matched comparison through epoch {last_epoch}"
     )

@@ -577,6 +577,22 @@ def validate_config(config: Mapping[str, Any]) -> None:
     if float(candidates.get("unmatched_weight", -1)) < 0:
         raise ConfigError("loss.edge.candidates.unmatched_weight must be non-negative")
 
+    degree = loss.get("degree")
+    if not isinstance(degree, Mapping):
+        raise ConfigError("loss.degree must be a mapping")
+    if not isinstance(degree.get("enabled"), bool):
+        raise ConfigError("loss.degree.enabled must be a boolean")
+    try:
+        degree_weight = float(degree.get("weight"))
+    except (TypeError, ValueError) as error:
+        raise ConfigError("loss.degree.weight must be numeric") from error
+    if not math.isfinite(degree_weight) or degree_weight < 0:
+        raise ConfigError("loss.degree.weight must be finite and non-negative")
+    if degree["enabled"] and degree_weight == 0:
+        raise ConfigError("enabled loss.degree requires positive weight")
+    for name in ("warmup_epochs", "ramp_epochs"):
+        _non_negative_int(degree.get(name), f"loss.degree.{name}")
+
     topology = config.get("topology")
     if not isinstance(topology, Mapping):
         raise ConfigError("topology must be a mapping")

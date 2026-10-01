@@ -302,6 +302,45 @@ class GraphCriterionTests(unittest.TestCase):
         self.assertTrue(torch.isfinite(tokens.grad).all())
         self.assertTrue(torch.isfinite(relation.linear.weight.grad).all())
 
+    def test_degree_consistency_penalizes_extra_edge_and_backpropagates(self):
+        # A three-node path has true degrees [1, 2, 1]. The third pair closes
+        # a false cycle, so making it likely must increase the degree loss.
+        pairs = torch.tensor([[0, 1], [1, 2], [0, 2]])
+        contexts = [(0, 3, pairs, 2, 1)]
+        correct = torch.tensor(
+            [[-5.0, 5.0], [-5.0, 5.0], [5.0, -5.0]]
+        )
+        false_cycle = correct.clone().detach().requires_grad_(True)
+        with torch.no_grad():
+            false_cycle[2] = torch.tensor([-5.0, 5.0])
+        correct_loss = GraphCriterion._degree_consistency_loss(correct, contexts)
+        false_loss = GraphCriterion._degree_consistency_loss(false_cycle, contexts)
+        self.assertGreater(float(false_loss), float(correct_loss) + 0.3)
+        false_loss.backward()
+        self.assertGreater(float(false_cycle.grad[2, 1]), 0.0)
+
+    def test_degree_loss_integrates_with_unmatched_negatives(self):
+        config = _config()
+        config["loss"]["degree"].update(enabled=True, weight=0.25)
+        config["loss"]["edge"]["candidates"].update(
+            include_unmatched=True,
+            unmatched_object_threshold=0.0,
+            max_active_unmatched=4,
+            max_unmatched_pairs_per_graph=8,
+            unmatched_weight=0.25,
+        )
+        criterion, relation = self._criterion(config)
+        tokens, predictions, targets = _batch()
+        losses = criterion(tokens, predictions, targets)
+        self.assertTrue(torch.isfinite(losses["degree"]))
+        self.assertGreater(float(losses["degree"]), 0.0)
+        self.assertTrue(torch.allclose(
+            losses["degree_weighted"], losses["degree"] * 0.25
+        ))
+        losses["total"].backward()
+        self.assertTrue(torch.isfinite(relation.linear.weight.grad).all())
+        self.assertTrue(torch.isfinite(tokens.grad).all())
+
     def test_unmatched_focal_candidates_average_both_orientations(self):
         config = _config()
         config["loss"]["edge"]["candidates"].update(

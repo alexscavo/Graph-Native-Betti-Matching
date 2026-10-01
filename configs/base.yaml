@@ -186,6 +186,11 @@ loss:
       mode: ratio_upsample
       positive_to_negative_ratio: 0.15
       tolerance: 0.02
+  degree:
+    enabled: false
+    weight: 0.0
+    warmup_epochs: 0
+    ramp_epochs: 0
 
 topology:
   betti_h0:

@@ -1,0 +1,29 @@
+defaults:
+  - finetune_ixi_vessels_q256_types_300ep.yaml
+
+# Matched IXI-only follow-up to the 300-epoch node-type baseline. The relation
+# head receives an expected-degree loss and difficult unmatched-query negatives.
+# Keep the 9,999 matched-pair budget and the established CE edge loss.
+experiment:
+  name: ixi_q256_degree_consistency_300ep
+
+loss:
+  weights:
+    class: 5.0
+  degree:
+    enabled: true
+    weight: 0.25
+    warmup_epochs: 10
+    ramp_epochs: 20
+  edge:
+    candidates:
+      include_unmatched: true
+      unmatched_object_threshold: 0.5
+      max_active_unmatched: 32
+      max_unmatched_pairs_per_graph: 256
+      unmatched_weight: 0.25
+      unmatched_warmup_epochs: 10
+      unmatched_ramp_epochs: 20
+
+tracking:
+  tags: [gnbm, ixi, degree-consistency, unmatched-negatives, class-weight-5, q256, scratch-init, 300ep]

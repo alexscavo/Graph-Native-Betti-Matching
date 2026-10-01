@@ -1,0 +1,34 @@
+defaults:
+  - finetune_ixi_vessels_q256_degree_consistency_300ep.yaml
+
+experiment:
+  name: ixi_q256_degree_consistency_smoke
+
+data:
+  datasets:
+    synthetic_mri:
+      train_samples: 64
+      validation_samples: 32
+
+training:
+  epochs: 2
+  checkpoint:
+    policy: none
+
+evaluation:
+  interval_epochs: 1
+  training_metrics:
+    enabled: false
+    save_best_checkpoint: false
+
+loss:
+  degree:
+    warmup_epochs: 0
+    ramp_epochs: 0
+  edge:
+    candidates:
+      unmatched_warmup_epochs: 0
+      unmatched_ramp_epochs: 0
+
+tracking:
+  enabled: false

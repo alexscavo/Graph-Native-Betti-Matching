@@ -388,6 +388,12 @@ class Trainer:
                         )
                         + "\n"
                     )
+                loss_path = output.parent / "training-losses.jsonl"
+                with loss_path.open("a", encoding="utf-8") as handle:
+                    handle.write(
+                        json.dumps({"epoch": int(epoch), **means}, sort_keys=True)
+                        + "\n"
+                    )
                 if self.tracker is not None and hasattr(self.tracker, "log_performance"):
                     self.tracker.log_performance(performance, epoch=epoch)
 

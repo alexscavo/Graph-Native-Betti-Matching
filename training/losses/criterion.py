@@ -101,6 +101,7 @@ class GraphCriterion(nn.Module):
         self.edge_config = loss["edge"]["classification"]
         self.candidates = loss["edge"]["candidates"]
         self.balancing = loss["edge"]["balancing"]
+        self.degree = loss["degree"]
         self.topology = config["topology"]
         self.domain_adaptation = config.get("domain_adaptation", {})
         self.validation = bool(validation)
@@ -269,6 +270,8 @@ class GraphCriterion(nn.Module):
     def _matched_edge_pool(self, tokens, target_edges, assignments):
         feature_parts = []
         label_parts = []
+        degree_contexts = []
+        offset = 0
         object_tokens = tokens[..., : self.object_queries, :]
         relation_tokens = tokens[
             ..., self.object_queries : self.object_queries + self.relation_tokens, :
@@ -294,6 +297,7 @@ class GraphCriterion(nn.Module):
                 device=tokens.device,
             )
             negatives = all_pairs[negative_mask]
+            negative_total = int(negatives.shape[0])
             positive_cap = self.candidates.get("positive_cap")
             if positive_cap is not None and positives.shape[0] > int(positive_cap):
                 positives = positives[: int(positive_cap)]
@@ -325,7 +329,46 @@ class GraphCriterion(nn.Module):
                     )
                 )
             )
-        return feature_parts, label_parts
+            if self.degree["enabled"]:
+                degree_contexts.append(
+                    (offset, count, pairs, positive_count, negative_total)
+                )
+            offset += int(pairs.shape[0])
+        return feature_parts, label_parts, degree_contexts
+
+    @staticmethod
+    def _degree_consistency_loss(relation_logits, contexts):
+        """Match expected node degrees to GT, correcting sampled negatives."""
+        losses = []
+        for offset, node_count, pairs, positive_count, negative_total in contexts:
+            pair_count = int(pairs.shape[0])
+            probabilities = relation_logits[offset : offset + pair_count].softmax(-1)[:, 1]
+            negative_count = pair_count - positive_count
+            if negative_count:
+                weights = torch.cat(
+                    (
+                        probabilities.new_ones(positive_count),
+                        probabilities.new_full(
+                            (negative_count,), negative_total / negative_count
+                        ),
+                    )
+                )
+            else:
+                weights = torch.ones_like(probabilities)
+            weighted = probabilities * weights
+            expected = probabilities.new_zeros(node_count)
+            expected = expected.index_add(0, pairs[:, 0], weighted)
+            expected = expected.index_add(0, pairs[:, 1], weighted)
+            target = probabilities.new_zeros(node_count)
+            if positive_count:
+                true_pairs = pairs[:positive_count]
+                ones = probabilities.new_ones(positive_count)
+                target = target.index_add(0, true_pairs[:, 0], ones)
+                target = target.index_add(0, true_pairs[:, 1], ones)
+            losses.append(F.smooth_l1_loss(expected, target, beta=1.0))
+        if not losses:
+            return relation_logits.sum() * 0.0
+        return torch.stack(losses).mean()
 
     def _unmatched_hard_negatives(self, tokens, logits, assignments):
         if not self.candidates.get("include_unmatched", False):
@@ -368,7 +411,7 @@ class GraphCriterion(nn.Module):
         return selected
 
     def loss_edges(self, tokens, node_logits, target_edges, assignments):
-        feature_parts, label_parts = self._matched_edge_pool(
+        feature_parts, label_parts, degree_contexts = self._matched_edge_pool(
             tokens, target_edges, assignments
         )
         if feature_parts:
@@ -377,6 +420,11 @@ class GraphCriterion(nn.Module):
         else:
             relation_logits = tokens.new_empty((0, 2))
             labels = torch.empty(0, dtype=torch.long, device=tokens.device)
+        degree_loss = (
+            self._degree_consistency_loss(relation_logits, degree_contexts)
+            if self.degree["enabled"]
+            else relation_logits.sum() * 0.0
+        )
         if labels.numel() and self.balancing["mode"] == "ratio_upsample":
             relation_logits, labels = _ratio_upsample(
                 relation_logits,
@@ -397,7 +445,7 @@ class GraphCriterion(nn.Module):
 
         hard_chunks = self._unmatched_hard_negatives(tokens, node_logits, assignments)
         if not hard_chunks:
-            return matched_loss
+            return matched_loss, degree_loss
         hard_logits = torch.cat(hard_chunks, dim=0)
         hard_labels = torch.zeros(
             hard_logits.shape[0], dtype=torch.long, device=tokens.device
@@ -415,9 +463,10 @@ class GraphCriterion(nn.Module):
             )
         matched_count = float(labels.numel())
         hard_count = float(hard_labels.numel())
-        return (
+        edge_loss = (
             matched_loss * matched_count + hard_loss * weight * hard_count
         ) / max(1.0, matched_count + weight * hard_count)
+        return edge_loss, degree_loss
 
     def _symmetric_edge_probabilities(self, object_tokens, relation_tokens, pairs):
         forward = self._relation_features(object_tokens, relation_tokens, pairs)
@@ -537,14 +586,16 @@ class GraphCriterion(nn.Module):
             predicted_structure=predicted_structure,
             candidate_indices=candidate_indices,
         )
+        edge_loss, degree_loss = self.loss_edges(
+            tokens, predictions["pred_logits"], targets["edges"], assignments
+        )
         losses = {
             "class": self.loss_classification(predictions["pred_logits"], assignments),
             "nodes": self.loss_nodes(predictions["pred_nodes"], targets["nodes"], assignments),
             "boxes": self.loss_boxes(predictions["pred_nodes"], targets["nodes"], assignments),
             "cardinality": self.loss_cardinality(predictions["pred_logits"], assignments),
-            "edges": self.loss_edges(
-                tokens, predictions["pred_logits"], targets["edges"], assignments
-            ),
+            "edges": edge_loss,
+            "degree": degree_loss,
         }
         if "node_types" in self.enabled_losses:
             if "pred_node_types" not in predictions:
@@ -576,6 +627,17 @@ class GraphCriterion(nn.Module):
             losses[name] * self.weights[name]
             for name in self.enabled_losses
         )
+        if self.degree["enabled"]:
+            degree_weight = float(self.degree["weight"])
+            if not self.validation:
+                degree_weight = scheduled_candidate_weight(
+                    self.epoch,
+                    degree_weight,
+                    self.degree["warmup_epochs"],
+                    self.degree["ramp_epochs"],
+                )
+            losses["degree_weighted"] = degree_loss * degree_weight
+            losses["total"] = losses["total"] + losses["degree_weighted"]
         for name in ("betti_h0", "betti_h1"):
             if self.topology[name]["enabled"] and not self.topology[name]["log_only"]:
                 losses["total"] = losses["total"] + losses[name + "_weighted"]

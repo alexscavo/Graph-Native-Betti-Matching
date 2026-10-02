@@ -30,15 +30,15 @@ limit. Dependent job **471400** will evaluate its validation-selected checkpoint
 on all 2,384 held-out IXI test patches with both plain and fixed 0.5-degree
 decoding; it will also save four sample images for each setting.
 
-![Matched validation progress through epoch 140](progress.png)
+![Matched validation progress through epoch 220](progress.png)
 
-At epoch 140, the new run predicted 70 edges and 20 cycles per validation
-patch, versus 169 edges and 102 cycles for the baseline at the same epoch.
-Ground truth averages 52 edges and 0.83 cycles. Edge F1 was 0.421 versus
-0.333, but node F1 was 0.433 versus 0.447. The new graph was also more
-fragmented: 16.7 predicted components per patch versus 2.4 for the baseline
-and 4.7 in ground truth. Branch F1 was 0.0046 versus 0.0079. Predicted nodes
-were 67 versus 69 (ground truth: 56), so the higher classification weight has
+At epoch 220, the new run predicted 77 edges and 23 cycles per validation
+patch, versus 158 edges and 92 cycles for the baseline at the same epoch.
+Ground truth averages 52 edges and 0.83 cycles. Edge F1 was 0.446 versus
+0.369, but node F1 was 0.466 versus 0.487. The new graph was also more
+fragmented: 12.3 predicted components per patch versus 2.5 for the baseline
+and 4.7 in ground truth. Branch F1 was 0.0057 versus 0.0093. Predicted nodes
+were 67 versus 68 (ground truth: 56), so the higher classification weight has
 not eliminated node overprediction. These are interim validation results, not
 the final test ranking. The lower cycle count alone is not sufficient evidence
 of better connectivity; the test comparison will include the 0.5 decoder.

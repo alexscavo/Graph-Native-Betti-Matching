@@ -16,7 +16,9 @@ export GNBM_OUTPUT_DIR="$GNBM_REPO_DIR/experiments/spline_learning/runs"
 export SYNTHETIC_MRI_DATASET="$GNBM_REPO_DIR/experiments/spline_learning/synthetic_mri_k8_10k_val2k"
 export UV_CACHE_DIR="$GNBM_REPO_DIR/.cache/uv" TORCH_EXTENSIONS_DIR="$GNBM_REPO_DIR/.cache/torch-extensions"
 export XDG_CACHE_HOME="$GNBM_REPO_DIR/.cache" MPLCONFIGDIR="$GNBM_REPO_DIR/.cache/matplotlib"
-export TMPDIR=/tmp WANDB_MODE=online
+# Compute-node online initialization has failed; retain test logs offline and
+# upload from a login node after evaluation.
+export TMPDIR=/tmp WANDB_MODE="${WANDB_MODE:-offline}"
 source cluster/jean_zay/env.sh
 source cluster/jean_zay/stage_spline_runtime.sh
 set -u

@@ -1,0 +1,44 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>SyntheticMRI · held-out test prediction</title>
+<style>body{margin:20px;background:#10232e;color:#e4eff1;font:15px system-ui}h1{margin-bottom:8px}p{max-width:1150px;line-height:1.5}label{display:inline-block;margin:5px 12px 5px 0}select,button{padding:7px;background:#203b49;color:#e4eff1;border:1px solid #557281;border-radius:5px}#plot{height:74vh;min-height:500px}#status{color:#b6cad0}</style>
+<h1>Held-out SyntheticMRI · <span id="sample"></span></h1>
+<p>These are the saved, fully decoded predictions from the validation-selected checkpoint used in the final test. Cyan curves and blue nodes are model outputs. Gray fitted splines, gold original guides, purple reference nodes and the vessel-mask surface are uncertain references. No refitting or topology correction is applied to predictions.</p>
+<div>
+<label><input id="mesh" type="checkbox" checked> Vessel mesh</label>
+<label>Mesh opacity <input id="opacity" type="range" min="0" max="60" value="15"> <span id="opacityValue">15%</span></label>
+<label><input id="targets" type="checkbox" checked> Reference splines/nodes</label>
+<label><input id="guides" type="checkbox"> Original guides</label>
+<label><input id="labels" type="checkbox"> Node labels</label>
+<label><input id="chords" type="checkbox"> Straight chords</label>
+<label><input id="controls" type="checkbox"> Predicted controls</label>
+<label>Focus predicted edge <select id="edge"><option value="all">All edges</option></select></label>
+<button id="reset">Reset camera</button>
+</div>
+<p id="status"></p><div id="plot"></div>
+<p>Drag to rotate; scroll to zoom. Click legend entries to hide/show layers. Select an edge to inspect its eight controls (six internal 3D controls = 18 learned offsets). Blue and purple node indices belong to their own graphs. Axes show patch-local physical coordinates in mm.</p>
+<script>__PLOTLY__</script><script>
+const DATA=__DATA__;
+const P=DATA.prediction, M=DATA.metric;
+let cameraRevision=0;
+const $=id=>document.getElementById(id);
+$('sample').textContent=DATA.sample;
+P.edges.forEach((e,i)=>$('edge').add(new Option(`${i}: ${e[0]} → ${e[1]} · p=${P.edge_scores[i].toFixed(3)}`,i)));
+function physical(points){return points.map(p=>M.map(row=>row.reduce((s,v,i)=>s+v*p[i],0)));}
+function lines(curves,name,color,width,dash){const p=curves.flatMap(c=>[...physical(c),[null,null,null]]);return{type:'scatter3d',mode:'lines',x:p.map(v=>v[0]),y:p.map(v=>v[1]),z:p.map(v=>v[2]),name,line:{color,width,dash}};}
+function nodes(points,name,color,size){const p=physical(points);return{type:'scatter3d',mode:$('labels').checked?'markers+text':'markers',x:p.map(v=>v[0]),y:p.map(v=>v[1]),z:p.map(v=>v[2]),name,text:p.map((_,i)=>String(i)),textposition:'top center',marker:{size,color},hovertemplate:name+' %{text}<br>(%{x:.2f}, %{y:.2f}, %{z:.2f}) mm<extra></extra>'};}
+function render(reset=false){
+ if(reset)cameraRevision++;
+ const selected=$('edge').value==='all'?null:Number($('edge').value), traces=[];
+ const opacity=Number($('opacity').value)/100;$('opacityValue').textContent=`${Math.round(opacity*100)}%`;
+ if($('mesh').checked&&DATA.mesh.vertices.length){const v=physical(DATA.mesh.vertices),f=DATA.mesh.faces;traces.push({type:'mesh3d',x:v.map(p=>p[0]),y:v.map(p=>p[1]),z:v.map(p=>p[2]),i:f.map(p=>p[0]),j:f.map(p=>p[1]),k:f.map(p=>p[2]),color:'#b0c3c4',opacity,name:'Existing vessel-mask mesh',showlegend:true,hoverinfo:'skip',lighting:{ambient:.6,diffuse:.8,roughness:.8,specular:.1}});}
+ if($('targets').checked){traces.push(lines(DATA.target_curves,'Reference fitted splines','#bfc6d0',3,'dot'));traces.push(nodes(DATA.target_nodes,'Reference nodes','#d6a6ff',4));}
+ if($('guides').checked)traces.push(lines(DATA.guides,'Original guides','#e3b665',3,'dot'));
+ traces.push(lines(P.spline_curves,'Predicted splines','#57edce',selected===null?6:2));
+ traces.push(nodes(P.nodes_dhw,'Predicted nodes','#65bfff',6));
+ if($('chords').checked)traces.push(lines(P.edges.map(([a,b])=>[P.nodes_dhw[a],P.nodes_dhw[b]]),'Predicted chords','#f39b92',2,'dash'));
+ if(selected!==null)traces.push(lines([P.spline_curves[selected]],'Selected predicted edge','#ffbd66',9));
+ if($('controls').checked){const indices=selected===null?P.edges.map((_,i)=>i):[selected];const controls=indices.map(i=>P.spline_controls[i]);traces.push(lines(controls,'Control polygons','#f09aff',2,'dot'));const flat=physical(controls.flat()),text=indices.flatMap(i=>P.spline_controls[i].map((_,j)=>`edge ${i} · C${j}${j===0||j===7?' · endpoint':''}`));traces.push({type:'scatter3d',mode:'markers',x:flat.map(p=>p[0]),y:flat.map(p=>p[1]),z:flat.map(p=>p[2]),name:'Predicted spline controls',text,marker:{size:4,color:'#f09aff',symbol:'diamond'},hovertemplate:'%{text}<br>(%{x:.2f}, %{y:.2f}, %{z:.2f}) mm<extra></extra>'});}
+ $('status').textContent=`Predicted: ${P.nodes_dhw.length} nodes, ${P.edges.length} edges. Reference: ${DATA.target_nodes.length} nodes, ${DATA.target_edges.length} edges.`+(selected===null?'':` Selected edge ${selected}: ${P.edges[selected].join(' → ')}, probability ${P.edge_scores[selected].toFixed(4)}.`);
+ Plotly.react('plot',traces,{uirevision:'test-prediction-'+cameraRevision,paper_bgcolor:'#10232e',font:{color:'#e4eff1'},scene:{aspectmode:'data',xaxis:{title:'X (mm)'},yaxis:{title:'Y (mm)'},zaxis:{title:'Z (mm)'}},margin:{l:0,r:0,b:0,t:0}},{responsive:true,displaylogo:false});
+}
+['mesh','targets','guides','labels','chords','controls','edge'].forEach(id=>$(id).onchange=()=>render());$('opacity').oninput=()=>render();$('reset').onclick=()=>render(true);render();
+</script></html>

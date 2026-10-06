@@ -18,6 +18,7 @@ export UV_CACHE_DIR="$GNBM_REPO_DIR/.cache/uv" TORCH_EXTENSIONS_DIR="$GNBM_REPO_
 export XDG_CACHE_HOME="$GNBM_REPO_DIR/.cache" MPLCONFIGDIR="$GNBM_REPO_DIR/.cache/matplotlib"
 export TMPDIR=/tmp WANDB_MODE=online
 source cluster/jean_zay/env.sh
+source cluster/jean_zay/stage_spline_runtime.sh
 set -u
 run="$GNBM_OUTPUT_DIR/spline_v0_k8_10k_val2k_50ep"
 python -u evaluate.py --config "$run/resolved-config.yaml" --checkpoint "$run/models/best_checkpoint.pt" \

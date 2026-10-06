@@ -1,4 +1,4 @@
-"""Fixed validation MRI/mask projections with decoded spline overlays."""
+"""Fixed validation MRI/mask projections with decoded straight or spline edges."""
 import json
 from pathlib import Path
 
@@ -22,7 +22,13 @@ def draw_projections(image, mask, nodes, guides, prediction, path, title):
             ax.imshow(image.max(axis=omitted), cmap='gray', origin='lower')
             overlay = np.ma.masked_where(~(mask > 0).any(axis=omitted), np.ones(np.delete(shape, omitted)))
             ax.imshow(overlay, cmap='Greens', alpha=.16, vmin=0, vmax=1, origin='lower')
-            curves = guides if row == 0 else np.asarray(prediction['spline_curves'])
+            if row == 0:
+                curves = guides
+            elif 'spline_curves' in prediction:
+                curves = np.asarray(prediction['spline_curves'])
+            else:
+                edges = np.asarray(prediction['edges'], dtype=int).reshape(-1, 2)
+                curves = np.asarray(prediction['nodes'])[edges]
             anchors = nodes if row == 0 else np.asarray(prediction['nodes'])
             color = '#ffb943' if row == 0 else '#00d3c2'
             for curve in curves:
@@ -60,12 +66,19 @@ def save_validation_projections(model, config, device, output, epoch, count):
         decoded = infer_graphs(tokens, predictions, model.relation_embed,
             object_queries=decoder['object_queries'], relation_tokens=decoder['relation_tokens'],
             node_threshold=config['evaluation']['node_threshold'], edge_threshold=config['evaluation']['edge_threshold'],
-            spline_head=model.spline_head, spline_metrics=[g['metric'] for g in batch[4]])
+            spline_head=model.spline_head, spline_metrics=([g['metric'] for g in batch[4]] if model.spline_head is not None else None))
         for j, graph in enumerate(decoded):
             sample = sample_ids[index]; index += 1
             path = root/f'epoch-{epoch:03d}'/f'{sample}.png'
+            if batch[4] is not None and batch[4][j] is not None:
+                guides = batch[4][j]['guides'].numpy()
+                reference_nodes = batch[2][j].numpy()
+            else:
+                reference_root = Path(config['evaluation']['visualization_reference_root'])
+                with np.load(reference_root/'val'/'spline'/f'{sample}.npz') as reference:
+                    guides = reference['guides']; reference_nodes = reference['nodes']
             draw_projections(batch[0][j].cpu().squeeze().numpy(), batch[1][j].cpu().squeeze().numpy(),
-                             batch[2][j].numpy(), batch[4][j]['guides'].numpy(), graph, path,
+                             reference_nodes, guides, graph, path,
                              f'{sample} · epoch {epoch}')
             paths.append(path)
     return paths

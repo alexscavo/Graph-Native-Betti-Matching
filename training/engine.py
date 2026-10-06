@@ -423,17 +423,24 @@ class Trainer:
                             epoch, validation.get("total", float("nan"))
                         )
                     )
+                    validation_total = validation.get("total")
+                    checkpoint_components = self.config['evaluation'].get('checkpoint_loss_components')
+                    checkpoint_total = (sum(validation[key] * float(self.config['loss']['weights'][key])
+                                            for key in checkpoint_components)
+                                        if checkpoint_components else validation_total)
+                    if checkpoint_components:
+                        validation['checkpoint_total'] = checkpoint_total
+                        print("checkpoint selection epoch={} common_graph_loss={:.6f}".format(epoch, checkpoint_total))
                     if self.tracker is not None:
                         self.tracker.log_validation(
                             validation,
                             iteration=global_iteration,
                             epoch=epoch,
                         )
-                    validation_total = validation.get("total")
                     with (output.parent / 'validation-losses.jsonl').open('a') as handle:
                         handle.write(json.dumps({'epoch': epoch, **validation}) + '\n')
                     visualization_count = int(self.config['evaluation'].get('validation_visualizations', 0))
-                    if visualization_count and self.config['model'].get('spline', {}).get('enabled', False):
+                    if visualization_count and (self.config['model'].get('spline', {}).get('enabled', False) or self.config['evaluation'].get('visualization_reference_root')):
                         from .evaluation.spline_visualization import save_validation_projections
                         image_paths = save_validation_projections(self.evaluation_model, self.config,
                             self.device, output.parent, epoch, visualization_count)
@@ -442,10 +449,10 @@ class Trainer:
                     monitored_metrics["validation_total"] = validation_total
                     if (
                         policy in {"best_only", "interval_and_best"}
-                        and validation_total is not None
-                        and validation_total < best_validation
+                        and checkpoint_total is not None
+                        and checkpoint_total < best_validation
                     ):
-                        best_validation = validation_total
+                        best_validation = checkpoint_total
                         save_best_validation = True
 
                 if metric_enabled and self.is_primary:

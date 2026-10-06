@@ -1,0 +1,17 @@
+defaults:
+  - scratch_comparison_spline_300ep.yaml
+experiment:
+  name: scratch_old_graph_10k_300ep
+data:
+  datasets:
+    synthetic_mri:
+      spline_controls: null
+model:
+  spline:
+    enabled: false
+loss:
+  enabled: [boxes, class, cardinality, nodes, edges]
+tracking:
+  tags: [gnbm, scratch, original-graph, synthetic-mri, paired-10k, 300epochs]
+evaluation:
+  visualization_reference_root: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/scratch_comparison_10k_300ep/spline

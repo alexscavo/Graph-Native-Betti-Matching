@@ -1,0 +1,17 @@
+defaults:
+  - finetune_spline_v0_10k.yaml
+experiment:
+  name: scratch_spline_k8_10k_300ep
+  seed: 364505
+data:
+  datasets:
+    synthetic_mri:
+      root: '${SYNTHETIC_MRI_DATASET}'
+training:
+  epochs: 300
+tracking:
+  mode: offline
+  group: synthetic-mri-scratch-10k-300ep
+  tags: [gnbm, scratch, spline-k8, synthetic-mri, paired-10k, 300epochs]
+evaluation:
+  checkpoint_loss_components: [boxes, class, cardinality, nodes, edges]

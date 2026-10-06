@@ -7,4 +7,8 @@ spline_runtime_dir="${JOBSCRATCH:-/tmp}/gnbm-spline-runtime-${SLURM_JOB_ID:-$$}"
 mkdir -p "$spline_runtime_dir"
 tar -xf "$spline_runtime_archive" -C "$spline_runtime_dir"
 export PYTHONPATH="$spline_runtime_dir${PYTHONPATH:+:$PYTHONPATH}"
+# Run the protected module interpreter so incomplete mutable venv packages
+# cannot shadow the module's complete fallback dependencies (e.g. SymPy).
+spline_runtime_python_prefix="$(python -c 'import sys; print(sys.base_prefix)')"
+export PATH="$spline_runtime_python_prefix/bin:$PATH"
 echo "Fixed job-local Python package copy: $spline_runtime_dir"

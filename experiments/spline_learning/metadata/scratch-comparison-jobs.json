@@ -1,0 +1,24 @@
+{
+  "old_job": 708757,
+  "spline_job": 708759,
+  "epochs": 300,
+  "initialization": "scratch; no checkpoint loaded",
+  "controls": 8,
+  "counts": {
+    "train": 10000,
+    "val": 1952,
+    "test": 13071
+  },
+  "shared_seed": 364505,
+  "code_commit": "dacb858",
+  "comparison_manifest": "/lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/scratch_comparison_10k_300ep/comparison-manifest.json",
+  "comparison_manifest_sha256": "31c5cfa2515e09cabb1eb87271cc9d383e990cd0039c9424548073797bebff41",
+  "preflight": "Passed exact IDs and triplets, common graph targets, real validation batches, models, identical common initialization, projections, and train entrypoint imports with protected interpreter.",
+  "wandb_mode": "offline; sync from login node",
+  "degree_two_variant": "Not submitted; follow-up experiment",
+  "slurm_time_limit": "20:00:00",
+  "submission_state": {
+    "708757": "PENDING (Priority)",
+    "708759": "PENDING (Priority)"
+  }
+}

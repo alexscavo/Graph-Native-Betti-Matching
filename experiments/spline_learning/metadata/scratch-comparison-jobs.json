@@ -15,10 +15,22 @@
   "comparison_manifest_sha256": "31c5cfa2515e09cabb1eb87271cc9d383e990cd0039c9424548073797bebff41",
   "preflight": "Passed exact IDs and triplets, common graph targets, real validation batches, models, identical common initialization, projections, and train entrypoint imports with protected interpreter.",
   "wandb_mode": "offline; sync from login node",
-  "degree_two_variant": "Not submitted; follow-up experiment",
+  "degree_two_variant": "Compact adaptive; third scratch arm submitted, gated on successful preparation",
   "slurm_time_limit": "20:00:00",
   "submission_state": {
     "708757": "PENDING (Priority)",
     "708759": "PENDING (Priority)"
-  }
+  },
+  "adaptive_prepare_job": 709919,
+  "adaptive_job": 709924,
+  "adaptive_code_commit": "d0ccbef",
+  "adaptive_target_policy": {
+    "radius_fraction": 0.75,
+    "floor_mm": 0.1,
+    "minimum_shortcut_containment": 0.95,
+    "preserve_original_adjacent_segments": true,
+    "smoothing_iterations": 0
+  },
+  "adaptive_query_policy": "120 if training/validation fit; otherwise smallest covering multiple of 32, guarded at 512; test does not set budget",
+  "adaptive_full_gt_state": "Pending preparation and preflight; no claim of completion"
 }

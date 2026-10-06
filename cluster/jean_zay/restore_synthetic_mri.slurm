@@ -16,7 +16,12 @@ export TMPDIR=/tmp IDR_DEBUG=WARN
 cd "$SLURM_SUBMIT_DIR"
 source cluster/jean_zay/env.sh
 set -u
-archive="$GNBM_REPO_DIR/experiments/spline_learning/datasets-restoration.tar"
+archive="${SYNTHETIC_MRI_RESTORE_ARCHIVE:-$GNBM_REPO_DIR/experiments/spline_learning/datasets-restoration.tar}"
+if ! test -f "$archive"; then
+    echo "Stage the STORE backup on WORK/SCRATCH from a login node and set SYNTHETIC_MRI_RESTORE_ARCHIVE." >&2
+    echo "Backup: /lustre/fsstor/projects/rech/vnc/upz25mj/archives/2026-10-06/source-datasets-2026-10-05.tar" >&2
+    exit 1
+fi
 parent=/lustre/fsn1/projects/rech/vnc/upz25mj/datasets
 staging="$parent/.syntheticMRI-restore-$SLURM_JOB_ID"
 backup="$parent/syntheticMRI.before-restore-$SLURM_JOB_ID"

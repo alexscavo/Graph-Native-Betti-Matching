@@ -494,6 +494,7 @@ def optimal_keep_mask(
     voxel_polyline: np.ndarray | None = None,
     mask: np.ndarray | None = None,
     minimum_chord_fraction: float = 1.0,
+    preserve_adjacent: bool = False,
 ) -> np.ndarray:
     """Retain the fewest dense samples satisfying geometry and containment.
 
@@ -502,6 +503,10 @@ def optimal_keep_mask(
     within the configured physical error and, when requested, inside the lumen.
     A shortest path from the first to last sample therefore gives the global
     minimum number of segments (and degree-2 subdivision nodes) for that branch.
+
+    With preserve_adjacent=True, existing guide segments remain feasible even
+    when uncertain guides and masks disagree. New shortcuts still satisfy both
+    constraints. The default preserves the original strict containment policy.
 
     Unlike greedy RDP followed by repair, relaxing either constraint can only add
     valid arcs, so the optimal retained-node count cannot increase.
@@ -541,6 +546,8 @@ def optimal_keep_mask(
             raise ValueError("voxel_polyline must match physical_polyline")
 
     def valid(start: int, end: int) -> bool:
+        if preserve_adjacent and end - start == 1:
+            return True
         if end - start > 1:
             anchor, tip = points[start], points[end]
             direction = tip - anchor
@@ -570,13 +577,16 @@ def optimal_keep_mask(
     predecessor = np.full(count, -1, dtype=np.int64)
     segments[0] = 0
     for end in range(1, count):
-        for start in range(end):
+        # Lowest predecessor cost first; the first feasible arc is optimal.
+        # Stable sorting retains the historical smallest-index tie break.
+        for start in sorted(range(end), key=lambda index: int(segments[index])):
             if segments[start] == unreachable or not valid(start, end):
                 continue
             candidate = int(segments[start]) + 1
             if candidate < segments[end]:
                 segments[end] = candidate
                 predecessor[end] = start
+                break
     if predecessor[-1] < 0:
         raise RuntimeError("no valid simplification path; adjacent dense samples must remain feasible")
 

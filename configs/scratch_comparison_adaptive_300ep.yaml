@@ -1,0 +1,6 @@
+defaults:
+  - scratch_comparison_old_300ep.yaml
+experiment:
+  name: scratch_adaptive_degree2_10k_300ep
+tracking:
+  tags: [gnbm, scratch, adaptive-degree2, synthetic-mri, paired-10k, 300epochs]

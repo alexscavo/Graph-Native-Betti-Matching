@@ -169,6 +169,11 @@ def main():
         "requested_sample_ids": selected_sample_ids,
         "evaluated_samples": summary["samples"],
         "bn_calibration_batches": calibration_batches,
+        "spline_evaluation": ({'endpoint_matching_threshold_mm': config['evaluation'].get('spline_branch_threshold_mm', 1.0),
+            'curve_samples': 257, 'distance_sample_spacing_mm': .25,
+            'geometry_population': 'Decoded branches with matched endpoint identities within threshold; coverage reported.',
+            'reference': 'Uncertain original full generator paths; mask support is complementary, not independent ground truth.'}
+            if config['model'].get('spline', {}).get('enabled', False) else None),
     }
     with (output_dir / "metadata.json").open("w", encoding="utf-8") as handle:
         json.dump(metadata, handle, indent=2, sort_keys=True)

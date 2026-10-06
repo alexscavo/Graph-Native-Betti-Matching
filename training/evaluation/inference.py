@@ -51,6 +51,8 @@ def infer_graphs(
     edge_threshold=None,
     node_type_degree_caps=False,
     node_type_degree_penalty=0.0,
+    spline_head=None,
+    spline_metrics=None,
 ):
     object_features = tokens[..., :object_queries, :]
     shared_relations = tokens[
@@ -140,6 +142,25 @@ def infer_graphs(
                         degrees[right] += 1
                 pairs = pairs[selected]
                 relation_scores = relation_scores[selected]
+        spline_output = {}
+        if spline_head is not None:
+            from models.spline import canonical_reverse
+            if spline_metrics is None:
+                raise ValueError('Spline inference requires normalized-to-physical metric metadata')
+            metric = spline_metrics[batch].to(tokens)
+            if pairs.numel():
+                endpoints = nodes[pairs]
+                reverse = canonical_reverse(endpoints @ metric.T)
+                pairs = pairs.clone(); pairs[reverse] = pairs[reverse][:, [1,0]]
+                query_pairs = query_ids[pairs]
+                parts = [object_features[batch, query_pairs[:,0]], object_features[batch, query_pairs[:,1]]]
+                if relation_tokens:
+                    parts.append(shared_relations[batch].reshape(1,-1).expand(len(pairs),-1))
+                controls, curves = spline_head(torch.cat(parts, dim=-1), nodes[pairs], metric)
+            else:
+                controls = nodes.new_empty((0,spline_head.controls,3))
+                curves = nodes.new_empty((0,len(spline_head.basis),3))
+            spline_output = {'spline_controls': controls.cpu(), 'spline_curves': curves.cpu(), 'spline_metric': metric.cpu()}
         graphs.append(
             {
                 "nodes": nodes.detach().cpu(),
@@ -148,6 +169,7 @@ def infer_graphs(
                 "edges": pairs.detach().cpu(),
                 "edge_scores": relation_scores.detach().cpu(),
                 "query_ids": query_ids.detach().cpu(),
+                **spline_output,
                 **({"node_type_scores": predictions["pred_node_types"][batch, query_ids].softmax(-1).detach().cpu()}
                    if "pred_node_types" in predictions else {}),
             }

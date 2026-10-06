@@ -59,6 +59,37 @@ def _config():
 
 
 class WandbTrackingTests(unittest.TestCase):
+    def test_connection_failure_preserves_offline_tracking(self):
+        from types import SimpleNamespace
+        class CommunicationError(Exception):
+            pass
+        run = _FakeRun()
+        class FailingOnlineWandb(_FakeWandb):
+            errors = SimpleNamespace(CommError=CommunicationError)
+            def init(self, **kwargs):
+                if kwargs.get('mode') == 'online':
+                    raise CommunicationError('network unavailable')
+                return super().init(**kwargs)
+        fake = FailingOnlineWandb(run)
+        with tempfile.TemporaryDirectory() as directory, patch.dict(sys.modules, {'wandb': fake}), patch.dict(
+            os.environ, {'WANDB_MODE': 'online'}, clear=False):
+            tracker = build_tracker(_config(), Path(directory), resume=False)
+            metadata = json.loads((Path(directory)/'wandb-run.json').read_text())
+        self.assertEqual(fake.init_calls[0]['mode'], 'offline')
+        self.assertEqual(metadata['mode'], 'offline')
+        self.assertIsNotNone(tracker)
+
+    def test_validation_images_use_validation_epoch(self):
+        from training.tracking import WandbTracker
+        from types import SimpleNamespace
+        run = _FakeRun()
+        tracker = WandbTracker(run)
+        fake_wandb = SimpleNamespace(Image=lambda path, caption: {'path': path, 'caption': caption})
+        with patch.dict(sys.modules, {'wandb': fake_wandb}):
+            tracker.log_validation_images([Path('/tmp/sample.png')], epoch=5)
+        self.assertEqual(run.logged[-1]['validation/epoch'], 5)
+        self.assertEqual(run.logged[-1]['validation/projections'][0]['path'], '/tmp/sample.png')
+
     def test_selection_epochs_and_patience_are_logged(self):
         from training.tracking import WandbTracker
         run = _FakeRun()

@@ -1,0 +1,47 @@
+defaults:
+  - finetune_synthetic_mri.yaml
+
+experiment:
+  name: spline_k8_v0
+runtime:
+  workers: 0
+tracking:
+  enabled: false
+data:
+  batch_size: 4
+  train_augmentation: false
+  datasets:
+    synthetic_mri:
+      root: experiments/spline_learning/targets_k8
+      train_samples: 4
+      validation_samples: 4
+      spline_controls: 8
+model:
+  spline:
+    enabled: true
+    controls: 8
+    samples: 64
+    residual_scale: mm
+training:
+  epochs: 500
+  warmup_epochs: 5
+  checkpoint:
+    policy: interval
+    interval_epochs: 500
+    latest_interval_epochs: 500
+loss:
+  enabled: [boxes, class, cardinality, nodes, edges, spline]
+  weights:
+    spline: 1.0 # Replaced by recorded common training-only gradient calibration.
+  spline:
+    mode: controls
+    beta_mm: 1.0
+  edge:
+    classification:
+      name: focal
+    balancing:
+      mode: none
+    candidates:
+      include_unmatched: false
+evaluation:
+  interval_epochs: 50

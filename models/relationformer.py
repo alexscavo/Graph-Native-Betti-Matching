@@ -84,6 +84,14 @@ class RelationFormer(nn.Module):
 
         relation_input_dim = hidden_dim * (2 + relation_tokens)
         self.relation_embed = MLP(relation_input_dim, hidden_dim, 2, 3)
+        spline = model.get('spline', {})
+        self.spline_head = None
+        if spline.get('enabled', False):
+            from .spline import SplineHead
+            with torch.random.fork_rng(devices=[]):
+                self.spline_head = SplineHead(relation_input_dim, hidden_dim,
+                                              spline.get('controls', 8), spline.get('samples', 64),
+                                              spline.get('residual_scale', 'mm'))
         self.domain_adaptation_enabled = bool(
             config.get("domain_adaptation", {}).get("enabled", False)
         )

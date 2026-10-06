@@ -94,6 +94,7 @@ class SyntheticMRIDataset(Dataset):
         graph_reader=read_vtp_graph,
         intensity_transform=None,
         rng=None,
+        spline_controls=None,
     ):
         if coordinate_space not in {"normalized", "voxel"}:
             raise ValueError("coordinate_space must be 'normalized' or 'voxel'")
@@ -104,6 +105,9 @@ class SyntheticMRIDataset(Dataset):
         self.foreground_mean = float(foreground_mean)
         self.coordinate_space = coordinate_space
         self.augment = bool(augment)
+        self.spline_controls = spline_controls
+        if spline_controls is not None and self.augment:
+            raise ValueError('Spline baseline requires augmentation off until all geometry transforms are implemented')
         self.rotate_90 = bool(rotate_90)
         self.zoom_range = (
             None
@@ -159,6 +163,18 @@ class SyntheticMRIDataset(Dataset):
         if self.coordinate_space == "voxel":
             nodes = normalize_voxel_coordinates(nodes, source_shape)
         edges = edges.long()
+        geometry = None
+        if self.spline_controls is not None:
+            import numpy as np
+            path = record.graph.parent.parent/'spline'/f'{record.sample_id}.npz'
+            with np.load(path, allow_pickle=False) as cache:
+                geometry = {key: torch.from_numpy(cache[key].copy()) for key in ('controls','curves','guides','metric')}
+                if not np.allclose(cache['nodes'], nodes.numpy(), atol=1e-6) or not np.array_equal(cache['edges'], edges.numpy()):
+                    raise ValueError(f'Spline cache / graph mismatch: {record.sample_id}')
+            if geometry['controls'].shape != (len(edges), int(self.spline_controls), 3):
+                raise ValueError('Spline cache control count mismatch')
+            if source_shape != self.image_size:
+                raise ValueError('Spline baseline requires native image size')
 
         if self.augment:
             turns = (
@@ -188,7 +204,7 @@ class SyntheticMRIDataset(Dataset):
             [segmentation],
             [nodes],
             [edges],
-            [None],
+            [geometry],
             [self.domain_label],
         )
 

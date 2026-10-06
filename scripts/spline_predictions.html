@@ -1,0 +1,21 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Spline learning · four-patch diagnostic</title>
+<style>body{background:#10232e;color:#e4eff1;font:15px system-ui;margin:24px}select{padding:7px;margin:8px}#plot{height:76vh}p{max-width:1000px;line-height:1.5}</style>
+<h1>SyntheticMRI · spline learning diagnostic</h1>
+<p>These are the four training patches, not held-out validation. Gray: fitted target splines. Gold: generator guide samples. Cyan: learned curves. Red: straight chords. Purple: target anchors; blue: predicted anchors. Generator paths are supplied guides, not perfect anatomical truth.</p>
+<label>Patch <select id="patch"></select></label><label>Prediction mode <select id="mode"><option value="matched">Matched positive pairs (geometry diagnostic)</option><option value="decoded">Decoded graph (predicted existence + geometry)</option></select></label>
+<label><input id="showMesh" type="checkbox" checked> Vessel-mask mesh</label><label>Mesh opacity <input id="meshOpacity" type="range" min="0" max="65" value="12"> <span id="opacityValue">12%</span></label>
+<p>The translucent surface is the existing SyntheticMRI segmentation, not a model prediction or an independent anatomical reference.</p>
+<p>Matched mode uses Hungarian correspondence and supplied positive edge identities to isolate geometry learning. Decoded mode uses predicted node and edge classifications. Neither repairs incorrect topology.</p><div id="plot"></div>
+<script>__PLOTLY__</script><script>const DATA=__DATA__;
+const patch=document.getElementById('patch'),mode=document.getElementById('mode');
+DATA.forEach((r,i)=>patch.add(new Option(r.sample,i)));
+function physical(points,m){return points.map(p=>m.map(row=>row.reduce((s,v,i)=>s+v*p[i],0)));}
+function lines(curves,name,color,width,dash){const p=curves.flatMap(c=>[...c,[null,null,null]]);return{type:'scatter3d',mode:'lines',x:p.map(x=>x[0]),y:p.map(x=>x[1]),z:p.map(x=>x[2]),name,line:{color,width,dash}};}
+function nodes(points,name,color){return{type:'scatter3d',mode:'markers+text',x:points.map(p=>p[0]),y:points.map(p=>p[1]),z:points.map(p=>p[2]),text:points.map((_,i)=>String(i)),name,marker:{size:7,color},textposition:'top center'};}
+function render(){const r=DATA[Number(patch.value)],m=r.metric,decoded=mode.value==='decoded',p=decoded?r.decoded.nodes:r.matched_nodes,c=decoded?r.decoded.spline_curves:r.matched_curves,e=decoded?r.decoded.edges:r.target_edges;
+ const traces=[lines(r.target_curves.map(c=>physical(c,m)),'Fitted targets','#c4cad2',4,'dot'),lines(r.guide_samples.map(c=>physical(c,m)),'Generator guides','#e3b665',2,'dot'),lines(c.map(c=>physical(c,m)),'Predicted splines','#57edce',5),lines(e.map(([a,b])=>physical([p[a],p[b]],m)),'Predicted chords','#dc8181',2,'dash'),nodes(physical(r.target_nodes,m),'Target anchors','#c69af4'),nodes(physical(p,m),'Predicted anchors','#65bfff')];
+ const opacity=Number(document.getElementById('meshOpacity').value)/100;document.getElementById('opacityValue').textContent=`${Math.round(opacity*100)}%`;
+ if(document.getElementById('showMesh').checked&&r.mesh){const v=physical(r.mesh.vertices,m),f=r.mesh.faces;traces.unshift({type:'mesh3d',x:v.map(p=>p[0]),y:v.map(p=>p[1]),z:v.map(p=>p[2]),i:f.map(p=>p[0]),j:f.map(p=>p[1]),k:f.map(p=>p[2]),color:'#a4b9ba',opacity,name:'Existing vessel-mask mesh',showlegend:true,hoverinfo:'skip',lighting:{ambient:.6,diffuse:.8,roughness:.8,specular:.1}});}
+ Plotly.react('plot',traces,{uirevision:'spline-comparison',paper_bgcolor:'#10232e',font:{color:'#e4eff1'},scene:{aspectmode:'data',xaxis:{title:'X (mm)'},yaxis:{title:'Y (mm)'},zaxis:{title:'Z (mm)'}},margin:{l:0,r:0,b:0,t:0}},{responsive:true});}
+document.getElementById('showMesh').onchange=render;document.getElementById('meshOpacity').oninput=render;
+patch.onchange=render;mode.onchange=render;render();</script></html>

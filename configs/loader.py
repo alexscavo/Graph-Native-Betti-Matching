@@ -113,6 +113,26 @@ def _non_negative_int(value: Any, location: str) -> int:
 
 
 def validate_config(config: Mapping[str, Any]) -> None:
+    spline = config.get('model',{}).get('spline',{})
+    if spline.get('enabled',False):
+        if config.get('data',{}).get('spatial_dims') != 3:
+            raise ConfigError('The initial spline learning implementation is 3D only')
+        count = _positive_int(spline.get('controls',8),'model.spline.controls')
+        if count < 4:
+            raise ConfigError('Cubic spline needs at least four controls')
+        _positive_int(spline.get('samples',64),'model.spline.samples')
+        if spline.get('residual_scale','mm') not in {'mm','relative'}:
+            raise ConfigError('model.spline.residual_scale must be mm or relative')
+        if config.get('data',{}).get('train_augmentation',False):
+            raise ConfigError('Spline augmentation is not implemented; disable train_augmentation')
+        if config.get('loss',{}).get('spline',{}).get('mode') not in {'controls','curve'}:
+            raise ConfigError('loss.spline.mode must be controls or curve')
+        if 'spline' not in config.get('loss',{}).get('enabled',[]):
+            raise ConfigError('Enabled spline head requires spline loss')
+        if float(config.get('loss',{}).get('weights',{}).get('spline',0)) <= 0:
+            raise ConfigError('loss.weights.spline must be positive')
+        if config['data']['datasets'].get('synthetic_mri',{}).get('spline_controls') != count:
+            raise ConfigError('Spline head and cached target control counts must match')
     if config.get("schema_version") != 1:
         raise ConfigError("schema_version must be 1")
 

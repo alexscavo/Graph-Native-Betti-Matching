@@ -1,0 +1,7 @@
+defaults:
+  - overfit_spline_v0.yaml
+experiment:
+  name: spline_k8_v1
+loss:
+  spline:
+    mode: curve

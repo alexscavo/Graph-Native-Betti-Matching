@@ -32,7 +32,7 @@ def _write_json(path, payload):
 
 
 def _move_graph_batch(batch, device, input_name, supervise_target_graphs):
-    images, segmentations, nodes, edges, _, domains = batch
+    images, segmentations, nodes, edges, geometry, domains = batch
     volumes = images if input_name == "image" else segmentations
     domains = domains.to(device=device, non_blocking=True)
     if supervise_target_graphs:
@@ -48,6 +48,9 @@ def _move_graph_batch(batch, device, input_name, supervise_target_graphs):
             "nodes": [nodes[index].to(device=device) for index in indices],
             "edges": [edges[index].to(device=device) for index in indices],
             "domains": domains[keep],
+            **({'spline': [{key: value.to(device=device) for key,value in geometry[index].items()}
+                          for index in indices]} if all(isinstance(geometry[index], Mapping) and 'controls' in geometry[index]
+                                                       for index in indices) else {}),
         },
     )
 
@@ -427,6 +430,15 @@ class Trainer:
                             epoch=epoch,
                         )
                     validation_total = validation.get("total")
+                    with (output.parent / 'validation-losses.jsonl').open('a') as handle:
+                        handle.write(json.dumps({'epoch': epoch, **validation}) + '\n')
+                    visualization_count = int(self.config['evaluation'].get('validation_visualizations', 0))
+                    if visualization_count and self.config['model'].get('spline', {}).get('enabled', False):
+                        from .evaluation.spline_visualization import save_validation_projections
+                        image_paths = save_validation_projections(self.evaluation_model, self.config,
+                            self.device, output.parent, epoch, visualization_count)
+                        if self.tracker is not None and hasattr(self.tracker, 'log_validation_images'):
+                            self.tracker.log_validation_images(image_paths, epoch=epoch)
                     monitored_metrics["validation_total"] = validation_total
                     if (
                         policy in {"best_only", "interval_and_best"}

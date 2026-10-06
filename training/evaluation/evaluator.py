@@ -62,6 +62,8 @@ def _prediction_record(sample_id, source_sample_id, prediction, metrics):
            if "node_type_scores" in prediction else {}),
         "edges": _tensor_values(prediction["edges"]),
         "edge_scores": _tensor_values(prediction["edge_scores"]),
+        **({key: _tensor_values(prediction[key]) for key in ('spline_controls','spline_curves','spline_metric')}
+           if 'spline_curves' in prediction else {}),
         "metrics": metrics,
     }
 
@@ -147,6 +149,8 @@ def evaluate_model(
             edge_threshold=evaluation.get("edge_threshold"),
             node_type_degree_caps=evaluation.get("node_type_degree_caps", False),
             node_type_degree_penalty=evaluation.get("node_type_degree_penalty", 0.0),
+            spline_head=getattr(model.module if hasattr(model,'module') else model, 'spline_head',None),
+            spline_metrics=([g['metric'] for g in batch[4]] if config['model'].get('spline',{}).get('enabled',False) else None),
         )
         for local_index, graph in enumerate(graphs):
             sample_id = "sample_{:06d}".format(sample_index)
@@ -168,6 +172,12 @@ def evaluate_model(
                 ),
                 return_detection_states=True,
             )
+            if 'spline_curves' in graph:
+                from .spline_metrics import evaluate_spline_graph
+                record = dataset_records[sample_index]
+                cache_path = record.graph.parent.parent/'spline'/f'{record.sample_id}.npz'
+                metrics.update(evaluate_spline_graph(graph, cache_path, batch[1][local_index].numpy(),
+                    threshold_mm=float(evaluation.get('spline_branch_threshold_mm', 1.0))))
             rows.append(metrics)
             node_detection_states.append(node_state)
             edge_detection_states.append(edge_state)
@@ -193,6 +203,13 @@ def evaluate_model(
         edge_detection_states=edge_detection_states,
         iou_thresholds=protocol.get("iou_thresholds"),
     )
+    if rows and 'spline_branch_tp' in rows[0]:
+        from .spline_metrics import aggregate_spline_metrics
+        summary.update(aggregate_spline_metrics(rows))
+        for key in ('spline_curve_mm', 'spline_guide_distance_mm', 'spline_tortuosity_error', 'spline_mask_support_fraction'):
+            # Generic aggregation computed dispersion of per-patch means;
+            # label it explicitly after replacing the mean by a branch mean.
+            summary[key+'_patch_mean_std'] = summary.pop(key+'_std')
     if output_dir is not None:
         with (output_dir / "summary.json").open("w", encoding="utf-8") as handle:
             json.dump(_json_safe(summary), handle, indent=2, sort_keys=True)

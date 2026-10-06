@@ -83,11 +83,13 @@ class GraphCriterion(nn.Module):
         relation_embed: nn.Module,
         *,
         validation: bool = False,
+        spline_head=None,
     ):
         super().__init__()
         self.config = config
         self.matcher = matcher
         self.relation_embed = relation_embed
+        self.spline_head = spline_head
         self.dimensions = int(config["data"]["spatial_dims"])
         decoder = config["model"]["decoder"]
         self.object_queries = int(decoder["object_queries"])
@@ -560,6 +562,46 @@ class GraphCriterion(nn.Module):
                 metrics[name] = torch.stack(sample_losses).mean()
         return metrics
 
+    def loss_spline(self, tokens, predictions, targets, assignments):
+        from models.spline import canonical_reverse
+        if self.spline_head is None or 'spline' not in targets:
+            raise ValueError('Spline loss requires the spline head and full-path target cache')
+        errors, control_errors, curve_errors, endpoint_errors = [], [], [], []
+        for batch, (source, target) in enumerate(assignments):
+            mapping = dict(zip(target.tolist(), source.tolist()))
+            target_edges = targets['edges'][batch]
+            selected = [i for i,(a,b) in enumerate(target_edges.tolist()) if a in mapping and b in mapping]
+            if not selected:
+                continue
+            pairs = torch.tensor([[mapping[a],mapping[b]] for a,b in target_edges[selected].tolist()], device=tokens.device)
+            geometry = targets['spline'][batch]
+            metric = geometry['metric'].to(tokens)
+            endpoints = predictions['pred_nodes'][batch, pairs, :3]
+            reverse = canonical_reverse(endpoints @ metric.T)
+            pairs[reverse] = pairs[reverse][:, [1,0]]
+            endpoints = predictions['pred_nodes'][batch, pairs, :3]
+            relation = tokens[batch, self.object_queries:self.object_queries+self.relation_tokens]
+            features = self._relation_features(tokens[batch, :self.object_queries], relation, pairs)
+            controls, curves = self.spline_head(features, endpoints, metric)
+            target_controls = geometry['controls'][selected].clone()
+            target_curves = geometry['curves'][selected].clone()
+            target_controls[reverse] = target_controls[reverse].flip(1)
+            target_curves[reverse] = target_curves[reverse].flip(1)
+            dc = (controls[:, 1:-1]-target_controls[:, 1:-1]) @ metric.T
+            dx = (curves-target_curves) @ metric.T
+            mode = self.config['loss']['spline']['mode']
+            delta = dc if mode=='controls' else dx
+            errors.append(F.smooth_l1_loss(delta, torch.zeros_like(delta), beta=float(self.config['loss']['spline'].get('beta_mm',1.)), reduction='none').mean((1,2)))
+            control_errors.append(dc.norm(dim=-1).mean(1))
+            curve_errors.append(dx.norm(dim=-1).mean(1))
+            endpoint_errors.append(((endpoints-target_controls[:, [0,-1]]) @ metric.T).norm(dim=-1).mean(1))
+        # Empty graphs still touch every head parameter, compatible with DDP.
+        zero = sum(p.sum()*0. for p in self.spline_head.parameters()) + predictions['pred_nodes'].sum()*0.
+        mean = lambda parts: torch.cat(parts).mean() if parts else zero
+        return {'spline': mean(errors), 'spline_control_mm': mean(control_errors),
+                'spline_curve_mm': mean(curve_errors), 'spline_endpoint_mm': mean(endpoint_errors),
+                'spline_positive_edges': tokens.new_tensor(sum(len(p) for p in errors))}
+
     def forward(self, tokens, predictions, targets):
         overflowing = [
             (index, int(len(nodes)))
@@ -604,6 +646,8 @@ class GraphCriterion(nn.Module):
                 predictions["pred_node_types"], targets["nodes"],
                 targets["edges"], assignments,
             )
+        if 'spline' in self.enabled_losses:
+            losses.update(self.loss_spline(tokens, predictions, targets, assignments))
         if "domain" in self.enabled_losses:
             if "domains" not in targets:
                 raise ValueError("domain loss requires batch domain labels")
@@ -652,6 +696,7 @@ def build_criterion(
         build_matcher(config),
         model.relation_embed,
         validation=validation,
+        spline_head=getattr(model, 'spline_head', None),
     )
 
 

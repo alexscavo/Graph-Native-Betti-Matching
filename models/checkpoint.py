@@ -121,12 +121,15 @@ def load_legacy_model_checkpoint(
     *,
     map_location: str | torch.device = "cpu",
     allow_missing_node_type_head: bool = False,
+    allow_missing_spline_head: bool = False,
 ) -> CheckpointCompatibility:
     """Load all active tensors and reject silent active-model incompatibilities."""
 
     checkpoint = load_checkpoint_file(path, map_location=map_location)
     report = checkpoint_compatibility(model, checkpoint)
     allowed_missing = {"node_type_embed.weight", "node_type_embed.bias"} if allow_missing_node_type_head else set()
+    if allow_missing_spline_head:
+        allowed_missing.update(key for key in model.state_dict() if key.startswith('spline_head.'))
     if (
         set(report.missing) - allowed_missing
         or report.unexpected

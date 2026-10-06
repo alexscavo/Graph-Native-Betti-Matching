@@ -84,6 +84,11 @@ class WandbTracker:
         )
         self.run.log(payload)
 
+    def log_validation_images(self, paths, *, epoch: int):
+        import wandb
+        self.run.log({'validation/epoch': int(epoch), 'validation/projections': [
+            wandb.Image(str(path), caption=Path(path).stem + f' · epoch {epoch}') for path in paths]})
+
     def log_selection(self, record):
         self.run.summary["checkpoints/" + record["metric"]] = {
             key: record[key]
@@ -158,7 +163,7 @@ def build_tracker(
     if launch_metadata:
         tracked_config["launch"] = dict(launch_metadata)
 
-    run = wandb.init(
+    init_options = dict(
         project=project,
         entity=entity,
         name=config["experiment"]["name"],
@@ -171,6 +176,15 @@ def build_tracker(
         mode=mode,
         save_code=bool(settings["save_code"]),
     )
+    try:
+        run = wandb.init(**init_options)
+    except wandb.errors.CommError:
+        if mode in ('offline', 'disabled'):
+            raise
+        print('W&B online connection failed; recording this run offline, including images, for later sync.')
+        mode = 'offline'
+        init_options['mode'] = mode
+        run = wandb.init(**init_options)
     metadata = {
         "id": run.id,
         "name": run.name,

@@ -148,9 +148,10 @@ def main():
         report = load_legacy_model_checkpoint(
             raw_model, args.initial_weights, map_location="cpu",
             allow_missing_node_type_head=bool(config["model"].get("node_type", {}).get("enabled", False)),
+            allow_missing_spline_head=bool(config['model'].get('spline', {}).get('enabled',False)),
         )
         if report.missing and rank == 0:
-            print("New node-type head initialized from scratch: {}".format(report.missing))
+            print("New optional head initialized from scratch: {}".format(report.missing))
     if args.resume:
         start_epoch, start_iteration, trainer_state = load_training_checkpoint(
             args.resume,

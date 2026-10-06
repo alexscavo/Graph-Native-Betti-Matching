@@ -1,0 +1,39 @@
+defaults:
+  - overfit_spline_v0.yaml
+experiment:
+  name: spline_v0_k8_10k_val2k_50ep
+runtime:
+  workers: 4
+data:
+  batch_size: 4
+  validation_batch_size: 4
+  datasets:
+    synthetic_mri:
+      root: experiments/spline_learning/synthetic_mri_k8_10k_val2k
+      train_samples: null
+      validation_samples: null
+training:
+  epochs: 50
+  warmup_epochs: 1
+  checkpoint:
+    policy: best_only
+    latest_interval_epochs: 1
+  early_stopping:
+    enabled: false
+loss:
+  weights:
+    spline: 1.4739989612791453
+evaluation:
+  interval_epochs: 5
+  validation_visualizations: 4
+  spline_branch_threshold_mm: 1.0
+  protocol:
+    max_detections: 120
+  training_metrics:
+    enabled: false
+    save_best_checkpoint: false
+    save_f1_checkpoints: false
+tracking:
+  enabled: true
+  mode: online
+  tags: [gnbm, spline-v0, k8, synthetic-mri, train-cap-10k, joint-finetune]

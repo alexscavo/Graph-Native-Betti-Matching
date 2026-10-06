@@ -1,0 +1,69 @@
+"""Fixed cubic spline geometry for an optional pairwise vessel head."""
+from __future__ import annotations
+
+import torch
+from torch import nn
+
+
+def cubic_basis(controls: int, samples: int = 64):
+    if controls < 4 or samples < 2:
+        raise ValueError('Cubic splines require >=4 controls and >=2 samples')
+    knots = torch.tensor([0.] * 4 + [i/(controls-3) for i in range(1, controls-3)] + [1.] * 4,
+                         dtype=torch.float64)
+    t = torch.linspace(0, 1, samples, dtype=torch.float64)
+    values = ((t[:, None] >= knots[:-1]) & (t[:, None] < knots[1:])).double()
+    for degree in range(1, 4):
+        width = len(knots)-degree-1
+        left = knots[degree:degree+width]-knots[:width]
+        right = knots[degree+1:degree+1+width]-knots[1:width+1]
+        values = ((t[:, None]-knots[:width])/left.clamp_min(1e-15)*values[:, :width]*(left>0)
+                  + (knots[degree+1:degree+1+width]-t[:, None])/right.clamp_min(1e-15)*values[:, 1:width+1]*(right>0))
+    values[-1] = 0; values[-1, -1] = 1
+    greville = torch.stack([knots[i+1:i+4].mean() for i in range(controls)])
+    return values.float(), greville.float()
+
+
+def canonical_reverse(endpoints_mm):
+    """Lexicographic physical orientation, without sorting on unstable query IDs."""
+    a, b = endpoints_mm[:, 0].detach(), endpoints_mm[:, 1].detach()
+    reverse = a[:, 0] > b[:, 0]
+    tied = a[:, 0] == b[:, 0]
+    for axis in (1, 2):
+        reverse = reverse | (tied & (a[:, axis] > b[:, axis]))
+        tied = tied & (a[:, axis] == b[:, axis])
+    return reverse
+
+
+class SplineHead(nn.Module):
+    """Predict physical residuals from pair tokens and explicit endpoint geometry.
+
+    Inputs/outputs are normalized DHW coordinates; metric maps them to physical
+    millimetres. No sigmoid/clipping: internal controls may lie outside a patch.
+    """
+    def __init__(self, pair_width, hidden_width, controls=8, samples=64, residual_scale='mm'):
+        super().__init__()
+        self.controls = int(controls)
+        self.residual_scale = residual_scale
+        basis, greville = cubic_basis(self.controls, samples)
+        self.register_buffer('basis', basis)
+        self.register_buffer('greville', greville)
+        self.network = nn.Sequential(nn.Linear(pair_width+10, hidden_width), nn.ReLU(),
+                                     nn.Linear(hidden_width, hidden_width), nn.ReLU(),
+                                     nn.Linear(hidden_width, 3*(self.controls-2)))
+        # Zero residual starts at an exactly linearly parameterized chord.
+        nn.init.zeros_(self.network[-1].weight); nn.init.zeros_(self.network[-1].bias)
+
+    def forward(self, pair_features, endpoints, metric):
+        physical = endpoints @ metric.T
+        chord = physical[:, 1]-physical[:, 0]
+        length = chord.norm(dim=-1, keepdim=True)
+        features = torch.cat((pair_features, physical.flatten(1), chord, length), dim=-1)
+        residual = self.network(features).reshape(-1, self.controls-2, 3)
+        if self.residual_scale == 'relative':
+            residual = residual * length[:, None].clamp_min(1e-6)
+        t = self.greville[None, 1:-1, None]
+        interior = physical[:, :1]*(1-t) + physical[:, 1:]*t + residual
+        controls = torch.cat((physical[:, :1], interior, physical[:, 1:]), dim=1) @ torch.linalg.inv(metric).T
+        # Copy endpoints exactly; inverse-affine roundoff must not disconnect edges.
+        controls = torch.cat((endpoints[:, :1], controls[:, 1:-1], endpoints[:, 1:]), dim=1)
+        return controls, self.basis @ controls

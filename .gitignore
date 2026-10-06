@@ -24,6 +24,7 @@ build/
 dist/
 *.egg-info/
 .pytest_cache/
+.cache/
 .mypy_cache/
 .ruff_cache/
 .coverage
@@ -52,6 +53,7 @@ logs/
 outputs/
 results/
 artifacts/
+/experiments/spline_learning/
 
 # Self-contained Plotly QC reports are regenerated from real IXI data and are
 # several MB each. Track their compact JSON/CSV/PNG evidence, not bundled JS.

@@ -21,7 +21,7 @@ def main():
     config = patches/'generation_config.json'
     index = patches/'patch_index.csv'
     assert config.read_bytes() == (args.snapshot/'generation_config.json').read_bytes(), 'Generation configuration differs from the saved source copy'
-    assert hashlib.sha256(index.read_bytes()).digest() == hashlib.sha256((args.snapshot/'patch_index.csv').read_bytes()).digest(), 'Patch index differs from the saved source copy'
+    assert hashlib.sha256(index.read_bytes()).digest() == hashlib.sha256((args.snapshot/'source-patch-index.csv').read_bytes()).digest(), 'Patch index differs from the saved source copy'
     rows = list(csv.DictReader(index.open()))
 
     def check(row):

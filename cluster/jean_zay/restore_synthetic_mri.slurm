@@ -32,7 +32,7 @@ echo "Extracting SyntheticMRI only to $staging"
 tar --extract --file="$archive" --directory="$staging" --strip-components=2 \
     --no-same-owner --no-same-permissions --touch datasets/syntheticMRI
 python -u scripts/verify_synthetic_mri_restore.py --root "$staging" \
-    --snapshot experiments/spline_learning/source_snapshot --archive "$archive"
+    --snapshot experiments/spline_learning/metadata --archive "$archive"
 test ! -e "$backup"
 if test -e "$parent/syntheticMRI"; then
     mv "$parent/syntheticMRI" "$backup"
@@ -41,5 +41,5 @@ if ! mv "$staging" "$parent/syntheticMRI"; then
     if test -e "$backup"; then mv "$backup" "$parent/syntheticMRI"; fi
     exit 1
 fi
-cp "$parent/syntheticMRI/restore-verification.json" experiments/spline_learning/source_snapshot/restore-verification.json
+cp "$parent/syntheticMRI/restore-verification.json" experiments/spline_learning/metadata/restore-verification.json
 echo "Restore complete: $parent/syntheticMRI; previous folder retained at $backup"

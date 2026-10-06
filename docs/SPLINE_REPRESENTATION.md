@@ -25,3 +25,11 @@ counts and matched-branch coverage accompany evaluation metrics.
 Generated caches belong on SCRATCH, with a link from
 `experiments/spline_learning/synthetic_mri_k8_10k_val2k`. Keep code/configs in
 Git and preserve manifests and compact scientific evidence on WORK.
+
+## Active artifacts
+
+`experiments/spline_learning/README.md` describes the current dataset link, run
+outputs, current logs and exact preparation/source metadata. Historical pilots,
+four-patch comparisons and recovery snapshots are archived in STORE; consult
+the [cleanup record](../../graph-representation/docs/projects-cleanup-2026-10-06.md)
+when reproducing them. They are not inputs to the main training run.

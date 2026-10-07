@@ -47,7 +47,7 @@
   "spline_checkpoint_verified": "Full model/optimizer/scheduler/runtime/trainer state; failing VTP target read passed",
   "recovery_code_commit": "edb30bc",
   "adaptive_verification_state": "COMPLETED exit 0",
-  "adaptive_train_state": "RUNNING",
+  "adaptive_train_state": "COMPLETED exit 0; epoch 300 / iteration 750000",
   "spline_resume_state": "COMPLETED exit 0; epoch 300 / iteration 750000",
   "straight_test_job": 730103,
   "straight_test_state": "COMPLETED exit 0; best and final checkpoints each tested on 13071 patches",
@@ -65,5 +65,12 @@
     "final epoch 300"
   ],
   "spline_test_protocol": "shared-guides-v2; same 13071 test IDs, topology/whole-curve geometry/object counts",
-  "spline_test_code_commit": "120419e"
+  "spline_test_code_commit": "120419e",
+  "adaptive_best_validation_epoch": 25,
+  "adaptive_test_job": 750145,
+  "adaptive_test_selections": [
+    "best validation epoch 25",
+    "final epoch 300"
+  ],
+  "adaptive_test_protocol": "shared-guides-v2; identical 13071 held-out samples"
 }

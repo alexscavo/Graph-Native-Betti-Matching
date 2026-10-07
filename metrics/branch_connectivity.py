@@ -30,7 +30,7 @@ class ContractedGraph:
     betti_1: int
 
 
-def contract_degree_two(nodes: np.ndarray, edges: np.ndarray) -> ContractedGraph:
+def contract_degree_two(nodes: np.ndarray, edges: np.ndarray, *, edge_polylines=None) -> ContractedGraph:
     positions = np.asarray(nodes, dtype=np.float64)
     if positions.ndim != 2 or positions.shape[1] not in (2, 3) or not np.isfinite(positions).all():
         raise ValueError("nodes must have finite shape (N,2) or (N,3)")
@@ -41,6 +41,29 @@ def contract_degree_two(nodes: np.ndarray, edges: np.ndarray) -> ContractedGraph
         raise ValueError("self-loops must be represented by a spatially embedded cycle")
     if len({tuple(sorted(pair)) for pair in links.tolist()}) != len(links):
         raise ValueError("duplicate source edges are ambiguous")
+    if edge_polylines is not None:
+        if len(edge_polylines) != len(links):
+            raise ValueError("one ordered polyline is required per edge")
+        for (a, b), curve in zip(links, edge_polylines):
+            curve = np.asarray(curve)
+            if curve.ndim != 2 or curve.shape[1] != positions.shape[1] or len(curve) < 2 or not np.isfinite(curve).all():
+                raise ValueError("invalid edge polyline")
+            if not np.allclose(curve[[0,-1]], positions[[a,b]], atol=1e-5):
+                raise ValueError("edge polyline endpoints do not match graph nodes")
+        edge_lookup = {tuple(sorted((int(a), int(b)))): i for i, (a,b) in enumerate(links)}
+
+    def geometry(path):
+        if edge_polylines is None:
+            return positions[path].copy()
+        pieces = []
+        for a,b in zip(path[:-1],path[1:]):
+            index = edge_lookup[tuple(sorted((a,b)))]
+            curve = np.asarray(edge_polylines[index])
+            if (a,b) != tuple(links[index]):
+                curve = curve[::-1]
+            pieces.append(curve if not pieces else curve[1:])
+        return np.concatenate(pieces)
+
     adjacency = [[] for _ in positions]
     parent = list(range(len(positions)))
 
@@ -80,7 +103,7 @@ def contract_degree_two(nodes: np.ndarray, edges: np.ndarray) -> ContractedGraph
         for neighbor, index in sorted(adjacency[start]):
             if index not in visited:
                 path = trace(start, neighbor, index)
-                branches.append(Branch(start, path[-1], positions[path].copy()))
+                branches.append(Branch(start, path[-1], geometry(path)))
     # Remaining edges lie in connected components with no degree != 2 node.
     for index, (a, b) in enumerate(links):
         if index in visited:
@@ -88,7 +111,7 @@ def contract_degree_two(nodes: np.ndarray, edges: np.ndarray) -> ContractedGraph
         path = trace(int(a), int(b), index)
         if path[-1] != a:
             raise ValueError("degree-2-only component is not a closed cycle")
-        curve = positions[path].copy()
+        curve = geometry(path)
         lengths = np.linalg.norm(np.diff(curve, axis=0), axis=1)
         centroid = (np.average((curve[:-1] + curve[1:]) / 2, axis=0, weights=lengths)
                     if lengths.sum() else curve[:-1].mean(axis=0))
@@ -101,7 +124,7 @@ def contract_degree_two(nodes: np.ndarray, edges: np.ndarray) -> ContractedGraph
     return ContractedGraph(anchors, roles, tuple(branches), beta_0, beta_1)
 
 
-def match_anchors(predicted: ContractedGraph, target: ContractedGraph, threshold_mm: float) -> dict[int, int]:
+def match_anchors(predicted: ContractedGraph, target: ContractedGraph, threshold_mm: float, *, include_isolated=False) -> dict[int, int]:
     """Maximum-cardinality, then minimum-distance one-to-one role-aware match."""
 
     if not np.isfinite(threshold_mm) or threshold_mm < 0:

@@ -172,10 +172,12 @@ def evaluate_model(
                 ),
                 return_detection_states=True,
             )
-            if 'spline_curves' in graph:
+            if 'spline_curves' in graph or evaluation.get('guide_reference_root'):
                 from .spline_metrics import evaluate_spline_graph
                 record = dataset_records[sample_index]
-                cache_path = record.graph.parent.parent/'spline'/f'{record.sample_id}.npz'
+                reference_root = evaluation.get('guide_reference_root')
+                cache_path = ((Path(reference_root)/record.graph.parent.parent.name/'spline'/f'{record.sample_id}.npz')
+                              if reference_root else record.graph.parent.parent/'spline'/f'{record.sample_id}.npz')
                 metrics.update(evaluate_spline_graph(graph, cache_path, batch[1][local_index].numpy(),
                     threshold_mm=float(evaluation.get('spline_branch_threshold_mm', 1.0))))
             rows.append(metrics)

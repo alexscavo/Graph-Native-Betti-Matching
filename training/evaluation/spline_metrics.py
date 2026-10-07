@@ -18,7 +18,19 @@ def evaluate_spline_graph(prediction, cache_path, segmentation, threshold_mm=1.0
         lookup = {tuple(sorted(edge)): i for i, edge in enumerate(target['edges'])}
         recovered = set(); errors = []; mask_support = []
         mask = np.asarray(segmentation).squeeze()
-        for edge, controls, sampled in zip(prediction['edges'], prediction['spline_controls'], prediction['spline_curves']):
+        if 'spline_curves' in prediction:
+            controls_all = prediction['spline_controls']
+            sampled_all = prediction['spline_curves']
+        else:
+            # Exact analytic geometry of the decoded straight-edge model.
+            # Four collinear controls express a chord as a cubic Bezier curve;
+            # these are derived endpoints, not predictions from a spline head.
+            nodes = np.asarray(prediction['nodes'])
+            edges = np.asarray(prediction['edges'], dtype=int).reshape(-1, 2)
+            endpoints = nodes[edges]
+            controls_all = endpoints[:, :1] + np.linspace(0, 1, 4)[None, :, None] * (endpoints[:, 1:] - endpoints[:, :1])
+            sampled_all = endpoints[:, :1] + np.linspace(0, 1, 64)[None, :, None] * (endpoints[:, 1:] - endpoints[:, :1])
+        for edge, controls, sampled in zip(prediction['edges'], controls_all, sampled_all):
             u, v = map(int, edge)
             if u not in mapping or v not in mapping:
                 continue

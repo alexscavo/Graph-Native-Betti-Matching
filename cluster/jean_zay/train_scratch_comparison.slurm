@@ -26,14 +26,20 @@ python -c 'import json,os; from pathlib import Path; p=Path(os.environ["SYNTHETI
 run_name=scratch_spline_k8_10k_300ep
 [[ "$arm" == old ]] && run_name=scratch_old_graph_10k_300ep
 [[ "$arm" == adaptive ]] && run_name=scratch_adaptive_degree2_10k_300ep
-if [[ -e "$GNBM_OUTPUT_DIR/$run_name/models/latest_checkpoint.pt" ]]; then
+resume_checkpoint="${COMPARISON_RESUME_CHECKPOINT:-}"
+if [[ -z "$resume_checkpoint" && -e "$GNBM_OUTPUT_DIR/$run_name/models/latest_checkpoint.pt" ]]; then
     echo "Refusing to overwrite an existing scratch run: $run_name" >&2
     exit 2
 fi
-# Deliberately no --initial-weights or --resume: both arms start from random weights.
+# Initial submissions start from random weights. Recovery restores complete state.
 config="configs/scratch_comparison_${arm}_300ep.yaml"
 if [[ "$arm" == adaptive ]]; then
     config="$comparison/adaptive/training-config.yaml"
     python -c 'import json,os; from pathlib import Path; p=Path(os.environ["SYNTHETIC_MRI_DATASET"]); m=json.load(open(p/"manifest.json")); assert not m["failures"]; assert m["counts"]=={"train":10000,"val":1952,"test":13071}; print("Adaptive object queries:",m["object_queries"],flush=True)'
 fi
-python -u train.py --config "$config"
+if [[ -n "$resume_checkpoint" ]]; then
+    [[ "$resume_checkpoint" == "$GNBM_OUTPUT_DIR/$run_name/models/latest_checkpoint.pt" && -f "$resume_checkpoint" ]]
+    python -u train.py --config "$config" --resume "$resume_checkpoint"
+else
+    python -u train.py --config "$config"
+fi

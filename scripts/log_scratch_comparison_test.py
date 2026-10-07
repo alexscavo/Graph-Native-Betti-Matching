@@ -16,7 +16,8 @@ subprocess.run([sys.executable,'scripts/evaluate_common_vessel_predictions.py','
 summary=json.loads((output/'summary.json').read_text())
 common=json.loads((output/'common-v2-summary.json').read_text())
 assert summary['samples']==len(shared['test_ids'])==13071
-population={'evaluated_test_patches':summary['samples'],'available_source_test_patches':source['available_counts']['test'],'original_test_patches':source['source_counts']['test'],'excluded_by_reason':source['excluded_counts']['test'],'selection':a.selection,'prediction_geometry':'Straight chords decoded from predicted endpoints; no spline head or GT geometry used in predictions.','geometry_reference':'Shared uncertain generator guides; matched geometry errors must accompany branch coverage.'}
+geometry=('Predicted cubic B-splines, with predicted endpoints and internal controls.' if config['model'].get('spline',{}).get('enabled',False) else 'Piecewise straight segments with predicted degree-two nodes.' if Path(config['data']['datasets']['synthetic_mri']['root']).name=='adaptive' else 'Straight chords decoded from predicted endpoints.')
+population={'evaluated_test_patches':summary['samples'],'available_source_test_patches':source['available_counts']['test'],'original_test_patches':source['source_counts']['test'],'excluded_by_reason':source['excluded_counts']['test'],'selection':a.selection,'prediction_geometry':geometry+' No GT geometry is used to construct predictions.','geometry_reference':'Shared uncertain generator guides; matched geometry errors must accompany branch coverage.'}
 (a.run/'test'/a.selection/'population.json').write_text(json.dumps(population,indent=2)+'\n')
 config['tracking']['mode']='offline'
 tracker=build_tracker(config,a.run,resume=True,launch_metadata={'purpose':f'Held-out {a.selection} checkpoint test'})

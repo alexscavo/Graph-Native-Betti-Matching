@@ -48,7 +48,7 @@
   "recovery_code_commit": "edb30bc",
   "adaptive_verification_state": "COMPLETED exit 0",
   "adaptive_train_state": "RUNNING",
-  "spline_resume_state": "RUNNING; strict state restoration completed; original W&B run ID retained",
+  "spline_resume_state": "COMPLETED exit 0; epoch 300 / iteration 750000",
   "straight_test_job": 730103,
   "straight_test_state": "COMPLETED exit 0; best and final checkpoints each tested on 13071 patches",
   "straight_best_validation_epoch": 35,
@@ -57,5 +57,13 @@
   "common_straight_scoring_job": 733084,
   "common_straight_scoring_state": "COMPLETED exit 0; best and final each scored 13071 patches",
   "common_protocol_tests": "14 focused tests passed",
-  "primary_comparison": "Shared full guides and endpoint topology; contract degree-two chains with geometry preserved; 1mm physical anchor/curve thresholds; 0.25mm curve sampling; separate raw nodes/anchors/controls"
+  "primary_comparison": "Shared full guides and endpoint topology; contract degree-two chains with geometry preserved; 1mm physical anchor/curve thresholds; 0.25mm curve sampling; separate raw nodes/anchors/controls",
+  "spline_best_validation_epoch": 170,
+  "spline_test_job": 737021,
+  "spline_test_selections": [
+    "best validation epoch 170",
+    "final epoch 300"
+  ],
+  "spline_test_protocol": "shared-guides-v2; same 13071 test IDs, topology/whole-curve geometry/object counts",
+  "spline_test_code_commit": "120419e"
 }

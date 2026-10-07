@@ -32,5 +32,21 @@
     "smoothing_iterations": 0
   },
   "adaptive_query_policy": "120 if training/validation fit; otherwise smallest covering multiple of 32, guarded at 512; test does not set budget",
-  "adaptive_full_gt_state": "Pending preparation and preflight; no claim of completion"
+  "adaptive_full_gt_state": "Complete and preflight passed",
+  "adaptive_verification_job": 721618,
+  "adaptive_dependency": "afterok:721618",
+  "adaptive_object_queries": 120,
+  "adaptive_max_nodes": 67,
+  "adaptive_supervised_max_nodes": 60,
+  "adaptive_prepare_failure": "CPU PyTorch import required IDR_DEBUG=WARN after target extraction completed",
+  "spline_original_state": "FAILED_FILESYSTEM_AFTER_EPOCH_171",
+  "spline_resume_job": 721673,
+  "spline_resume_epoch": 171,
+  "spline_resume_iteration": 427500,
+  "spline_resume_checkpoint": "models/latest_checkpoint.pt",
+  "spline_checkpoint_verified": "Full model/optimizer/scheduler/runtime/trainer state; failing VTP target read passed",
+  "recovery_code_commit": "edb30bc",
+  "adaptive_verification_state": "COMPLETED exit 0",
+  "adaptive_train_state": "RUNNING",
+  "spline_resume_state": "RUNNING; strict state restoration completed; original W&B run ID retained"
 }

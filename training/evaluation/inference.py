@@ -71,6 +71,9 @@ def infer_graphs(
         raise ValueError("degree-aware decoding requires pred_node_types")
 
     graphs = []
+    use_evidence = spline_head is not None and spline_head.curve_evidence is not None
+    if 'curve_image_features' in predictions and not use_evidence:
+        raise ValueError('Curve image features require the matching spline/evidence head')
     for batch in range(tokens.shape[0]):
         query_ids = torch.nonzero(valid[batch], as_tuple=False).flatten()
         boxes = predictions["pred_nodes"][batch, query_ids]
@@ -98,6 +101,13 @@ def infer_graphs(
             relation_logits = 0.5 * (
                 relation_embed(forward) + relation_embed(reverse)
             )
+            if use_evidence:
+                from models.curve_evidence import curve_relation_logits
+                if spline_metrics is None:
+                    raise ValueError('Curve evidence requires physical metric metadata')
+                relation_logits = curve_relation_logits(relation_embed, spline_head,
+                    object_features[batch], shared_relations[batch], predictions['pred_nodes'][batch, :, :3],
+                    query_pairs, spline_metrics[batch].to(tokens), predictions['curve_image_features'][batch])
             probabilities = relation_logits.softmax(-1)[:, 1]
             if node_type_degree_penalty:
                 if edge_threshold is None:

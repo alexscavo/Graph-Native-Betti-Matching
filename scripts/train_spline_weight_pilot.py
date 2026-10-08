@@ -118,6 +118,10 @@ def main():
     settings.update(train_samples=pilot['train_samples'], validation_samples=pilot['validation_samples'],
                     sample_cap_selection='seeded_random', sample_cap_seed=pilot['seed'])
     config['loss']['weights']['spline'] = pilot['arms'][args.arm]
+    if 'image_evidence_scales' in pilot:
+        config['model']['spline']['curve_evidence'] = dict(
+            enabled=True, channels=8, samples=32, chunk_size=256,
+            scale=pilot['image_evidence_scales'][args.arm])
     config['tracking'].update(enabled=not args.smoke, mode='offline', group=pilot.get('tracking_group', 'spline-weight-pilot-20261008'),
                               tags=['gnbm', 'spline', 'weight-pilot', args.arm])
     assert config['data']['batch_size'] == 4 and not config['data']['train_augmentation']
@@ -177,6 +181,7 @@ def main():
                   'initial_epoch': pilot.get('initial_epoch', 0),
                   'schedule_start_update': schedule_start,
                   'spline_ramp_updates': int(pilot.get('spline_ramp_updates', 0)),
+                  'image_evidence_scale': pilot.get('image_evidence_scales', {}).get(args.arm),
                   'base_config_sha256': hashlib.sha256(Path(pilot['base_config']).read_bytes()).hexdigest()}
     write_json(output / 'provenance.json', provenance)
     tracker = build_tracker(config, output, resume=False, launch_metadata=provenance)

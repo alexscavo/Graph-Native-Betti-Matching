@@ -91,7 +91,7 @@ class RelationFormer(nn.Module):
             with torch.random.fork_rng(devices=[]):
                 self.spline_head = SplineHead(relation_input_dim, hidden_dim,
                                               spline.get('controls', 8), spline.get('samples', 64),
-                                              spline.get('residual_scale', 'mm'))
+                                              spline.get('residual_scale', 'mm'), spline.get('curve_evidence'))
         self.domain_adaptation_enabled = bool(
             config.get("domain_adaptation", {}).get("enabled", False)
         )
@@ -137,6 +137,8 @@ class RelationFormer(nn.Module):
             "pred_logits": self.class_embed(object_tokens),
             "pred_nodes": self.coord_embed(object_tokens).sigmoid(),
         }
+        if self.spline_head is not None and self.spline_head.curve_evidence is not None:
+            predictions['curve_image_features'] = self.spline_head.curve_evidence.encode(samples)
         if self.node_type_embed is not None:
             predictions["pred_node_types"] = self.node_type_embed(object_tokens)
         if self.domain_adaptation_enabled:

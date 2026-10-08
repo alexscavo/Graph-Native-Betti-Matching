@@ -40,7 +40,7 @@ class SplineHead(nn.Module):
     Inputs/outputs are normalized DHW coordinates; metric maps them to physical
     millimetres. No sigmoid/clipping: internal controls may lie outside a patch.
     """
-    def __init__(self, pair_width, hidden_width, controls=8, samples=64, residual_scale='mm'):
+    def __init__(self, pair_width, hidden_width, controls=8, samples=64, residual_scale='mm', curve_evidence=None):
         super().__init__()
         self.controls = int(controls)
         self.residual_scale = residual_scale
@@ -52,6 +52,13 @@ class SplineHead(nn.Module):
                                      nn.Linear(hidden_width, 3*(self.controls-2)))
         # Zero residual starts at an exactly linearly parameterized chord.
         nn.init.zeros_(self.network[-1].weight); nn.init.zeros_(self.network[-1].bias)
+        self.curve_evidence = None
+        if curve_evidence and curve_evidence.get('enabled', False):
+            from .curve_evidence import CurveEvidence
+            with torch.random.fork_rng(devices=[]):
+                self.curve_evidence = CurveEvidence(
+                    channels=curve_evidence.get('channels', 8), samples=curve_evidence.get('samples', 32),
+                    scale=curve_evidence.get('scale', 1.), chunk_size=curve_evidence.get('chunk_size', 256))
 
     def forward(self, pair_features, endpoints, metric):
         physical = endpoints @ metric.T

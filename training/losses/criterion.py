@@ -269,7 +269,7 @@ class GraphCriterion(nn.Module):
             return torch.empty((0, 2), dtype=torch.long, device=device)
         return torch.as_tensor(result, dtype=torch.long, device=device)
 
-    def _matched_edge_pool(self, tokens, target_edges, assignments):
+    def _matched_edge_pool(self, tokens, target_edges, assignments, pair_contexts=None):
         feature_parts = []
         label_parts = []
         degree_contexts = []
@@ -319,6 +319,8 @@ class GraphCriterion(nn.Module):
                     reverse = torch.rand(pairs.shape[0], device=tokens.device) > 0.5
                     pairs[reverse] = pairs[reverse][:, [1, 0]]
             pairs = torch.cat((positives, negatives), dim=0)
+            if pair_contexts is not None:
+                pair_contexts.append((batch, source[pairs]))
             matched_tokens = object_tokens[batch, source]
             feature_parts.append(
                 self._relation_features(matched_tokens, relation_tokens[batch], pairs)
@@ -372,7 +374,7 @@ class GraphCriterion(nn.Module):
             return relation_logits.sum() * 0.0
         return torch.stack(losses).mean()
 
-    def _unmatched_hard_negatives(self, tokens, logits, assignments):
+    def _unmatched_hard_negatives(self, tokens, logits, assignments, predictions=None, targets=None):
         if not self.candidates.get("include_unmatched", False):
             return []
         object_tokens = tokens[..., : self.object_queries, :]
@@ -405,6 +407,8 @@ class GraphCriterion(nn.Module):
                 self.relation_embed(forward_features)
                 + self.relation_embed(reverse_features)
             )
+            if self.spline_head is not None and self.spline_head.curve_evidence is not None:
+                pool_logits = self._curve_logits(tokens, predictions, targets, batch, pairs)
             hard_logits, _ = select_hard_unmatched_relation_logits(
                 pool_logits, self.candidates["max_unmatched_pairs_per_graph"]
             )
@@ -412,12 +416,25 @@ class GraphCriterion(nn.Module):
                 selected.append(hard_logits)
         return selected
 
-    def loss_edges(self, tokens, node_logits, target_edges, assignments):
+    def _curve_logits(self, tokens, predictions, targets, batch, pairs):
+        from models.curve_evidence import curve_relation_logits
+        return curve_relation_logits(self.relation_embed, self.spline_head,
+            tokens[batch, :self.object_queries],
+            tokens[batch, self.object_queries:self.object_queries+self.relation_tokens],
+            predictions['pred_nodes'][batch, :, :3], pairs,
+            targets['spline'][batch]['metric'].to(tokens), predictions['curve_image_features'][batch])
+
+    def loss_edges(self, tokens, node_logits, target_edges, assignments, predictions=None, targets=None):
+        pair_contexts = []
         feature_parts, label_parts, degree_contexts = self._matched_edge_pool(
-            tokens, target_edges, assignments
+            tokens, target_edges, assignments, pair_contexts
         )
         if feature_parts:
-            relation_logits = self.relation_embed(torch.cat(feature_parts, dim=0))
+            if self.spline_head is not None and self.spline_head.curve_evidence is not None:
+                relation_logits = torch.cat([self._curve_logits(tokens, predictions, targets, batch, pairs)
+                                             for batch, pairs in pair_contexts])
+            else:
+                relation_logits = self.relation_embed(torch.cat(feature_parts, dim=0))
             labels = torch.cat(label_parts, dim=0)
         else:
             relation_logits = tokens.new_empty((0, 2))
@@ -445,7 +462,7 @@ class GraphCriterion(nn.Module):
             parameter.sum() * 0.0 for parameter in self.relation_embed.parameters()
         )
 
-        hard_chunks = self._unmatched_hard_negatives(tokens, node_logits, assignments)
+        hard_chunks = self._unmatched_hard_negatives(tokens, node_logits, assignments, predictions, targets)
         if not hard_chunks:
             return matched_loss, degree_loss
         hard_logits = torch.cat(hard_chunks, dim=0)
@@ -629,7 +646,7 @@ class GraphCriterion(nn.Module):
             candidate_indices=candidate_indices,
         )
         edge_loss, degree_loss = self.loss_edges(
-            tokens, predictions["pred_logits"], targets["edges"], assignments
+            tokens, predictions["pred_logits"], targets["edges"], assignments, predictions, targets
         )
         losses = {
             "class": self.loss_classification(predictions["pred_logits"], assignments),

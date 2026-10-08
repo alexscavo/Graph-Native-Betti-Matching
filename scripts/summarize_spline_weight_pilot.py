@@ -20,7 +20,8 @@ def main():
         assert a[key] == b[key], (key, a[key], b[key])
     for key in ('initial_checkpoint', 'initial_epoch', 'schedule_start_update', 'spline_ramp_updates'):
         assert a.get(key) == b.get(key), key
-    assert a['updates'] == 5000 and a['weight'] != b['weight']
+    assert a['updates'] == 5000
+    assert a['weight'] != b['weight'] or a.get('image_evidence_scale') != b.get('image_evidence_scale')
     if args.arms == ['original', 'reduced']:
         assert abs(a['weight'] / b['weight'] - 10) < 1e-12
     membership = [(args.root / arm / 'dataset-manifest.json').read_bytes() for arm in runs]
@@ -29,6 +30,7 @@ def main():
     for arm, run in runs.items():
         f = run['final']; assert f['update'] == 5000
         rows.append({'arm': arm, 'spline_weight': run['provenance']['weight'],
+                     'image_evidence_scale': run['provenance'].get('image_evidence_scale'),
                      'updates': f['update'], 'train_node_loss': f['training']['nodes'],
                      'train_edge_loss': f['training']['edges'],
                      'train_spline_curve_mm': f['training']['spline_curve_mm'],

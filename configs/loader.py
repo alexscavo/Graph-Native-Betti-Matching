@@ -134,6 +134,19 @@ def validate_config(config: Mapping[str, Any]) -> None:
             raise ConfigError('loss.weights.spline must be non-negative')
         if config['data']['datasets'].get('synthetic_mri',{}).get('spline_controls') != count:
             raise ConfigError('Spline head and cached target control counts must match')
+        evidence = spline.get('curve_evidence', {})
+        if evidence.get('enabled', False):
+            if config['training']['input'] != 'image':
+                raise ConfigError('Curve evidence requires MRI image input, never a target segmentation')
+            for key in ('channels', 'samples', 'chunk_size'):
+                _positive_int(evidence.get(key, {'channels':8, 'samples':32, 'chunk_size':256}[key]), 'curve_evidence.' + key)
+            if int(evidence.get('samples', 32)) < 2:
+                raise ConfigError('Curve evidence needs at least two samples')
+            if not math.isfinite(float(evidence.get('scale', 1.))) or float(evidence.get('scale', 1.)) < 0:
+                raise ConfigError('Curve evidence scale must be finite and non-negative')
+            if config['model']['matcher']['type'] != 'hungarian' or any(
+                config['topology'][key]['enabled'] for key in ('betti_h0', 'betti_h1')):
+                raise ConfigError('Initial curve-evidence experiment supports Hungarian matching with Betti losses disabled')
     if config.get("schema_version") != 1:
         raise ConfigError("schema_version must be 1")
 

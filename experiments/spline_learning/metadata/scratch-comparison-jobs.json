@@ -72,5 +72,11 @@
     "best validation epoch 25",
     "final epoch 300"
   ],
-  "adaptive_test_protocol": "shared-guides-v2; identical 13071 held-out samples"
+  "adaptive_test_protocol": "shared-guides-v2; identical 13071 held-out samples",
+  "spline_test_state": "COMPLETED exit 0; best and final, each 13071 patches",
+  "adaptive_test_state": "COMPLETED exit 0; best and final, each 13071 patches",
+  "comparison_report": "graph-representation/docs/scratch-comparison-results.md",
+  "comparison_csv": "experiments/spline_learning/metadata/comparison/comparison.csv",
+  "comparison_source_validation": "Six evaluations, exact shared IDs, common protocol v2, 12 summary checksums verified",
+  "spline_comparison_warning": "Constant counts across 13071 patches; zero recovered branches; two-subject saved-coordinate differences only ~7.6e-6mm. Requires diagnosis, not a conclusion that splines cannot work."
 }

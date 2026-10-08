@@ -59,7 +59,7 @@ def main():
                      **{key:common.get(key) for key,_ in COMMON+COUNTS},'native_node_f1':native['node_f1'],'native_edge_f1':native['edge_f1'],
                      'native_target_nodes':native['target_nodes'],'native_target_edges':native['target_edges']})
     with (args.output/'comparison.csv').open('w',newline='') as f:
-        writer=csv.DictWriter(f,fieldnames=list(flat[0]));writer.writeheader();writer.writerows(flat)
+        writer=csv.DictWriter(f,fieldnames=list(flat[0]),lineterminator='\n');writer.writeheader();writer.writerows(flat)
     (args.output/'provenance.json').write_text(json.dumps(provenance,indent=2)+'\n')
     parts=['# Three scratch trainings: completed held-out comparison',
            'All three train from scratch for 300 epochs on the same 10,000 vessel patches, with 1,952 validation and 13,071 held-out test patches. All use 120 object queries, batch 4, the same seed and shared optimizer/schedule. The spline arm adds its head and fixed geometry loss weight 1.4739989612791453.',

@@ -129,8 +129,9 @@ def validate_config(config: Mapping[str, Any]) -> None:
             raise ConfigError('loss.spline.mode must be controls or curve')
         if 'spline' not in config.get('loss',{}).get('enabled',[]):
             raise ConfigError('Enabled spline head requires spline loss')
-        if float(config.get('loss',{}).get('weights',{}).get('spline',0)) <= 0:
-            raise ConfigError('loss.weights.spline must be positive')
+        # Zero enables graph-only controls and a delayed geometry curriculum.
+        if float(config.get('loss',{}).get('weights',{}).get('spline',0)) < 0:
+            raise ConfigError('loss.weights.spline must be non-negative')
         if config['data']['datasets'].get('synthetic_mri',{}).get('spline_controls') != count:
             raise ConfigError('Spline head and cached target control counts must match')
     if config.get("schema_version") != 1:

@@ -18,6 +18,7 @@ from configs import validate_config
 from data.loaders import build_data_loaders, build_evaluation_loader, dataset_sample_manifest
 from metrics.common_vessel_metrics import evaluate_common_vessels, aggregate_common_vessels
 from models import build_model
+from models.checkpoint import load_legacy_model_checkpoint, load_checkpoint_file
 from training.engine import train_step, evaluate_loss, _move_graph_batch
 from training.evaluation import evaluate_model
 from training.evaluation.spline_visualization import draw_projections
@@ -62,7 +63,7 @@ def sensitivity(model, batch, config):
             'transformer_memory_pair_mae': float((memory[0][0] - memory[0][1]).abs().mean())}
 
 
-def geometry(model, loader, config, output, step, tracker, subset_epoch):
+def geometry(model, loader, config, output, step, tracker, subset_epoch, score_chords=False):
     destination = output / f'validation-{step:06d}'
     native, _ = evaluate_model(model, loader, config, 'cuda', output_dir=destination)
     records = json.loads((destination / 'predictions.json').read_text())
@@ -72,6 +73,13 @@ def geometry(model, loader, config, output, step, tracker, subset_epoch):
         {'nodes': r['nodes_dhw'], 'edges': r['edges'], 'spline_controls': r['spline_controls']},
         root / 'val/spline' / (r['source_sample_id'] + '.npz'))) for r in records]
     common = aggregate_common_vessels(common_rows)
+    if score_chords:
+        chord_rows = [dict(sample_id=r['source_sample_id'], **evaluate_common_vessels(
+            {'nodes': r['nodes_dhw'], 'edges': r['edges']},
+            root / 'val/spline' / (r['source_sample_id'] + '.npz'))) for r in records]
+        chord_summary = aggregate_common_vessels(chord_rows)
+        write_json(destination / 'same-endpoint-chords-summary.json', chord_summary)
+        common['same_endpoint_chord_common_curve_f1'] = chord_summary['common_curve_f1']
     write_json(destination / 'common-v2-summary.json', common)
     write_json(destination / 'common-v2-per-patch.json', common_rows)
     paths = []
@@ -89,6 +97,7 @@ def geometry(model, loader, config, output, step, tracker, subset_epoch):
         tracker.log_validation_images(paths, epoch=subset_epoch)
         tracker.log_metrics({**native, **common}, iteration=step, epoch=subset_epoch)
     return {'native_node_f1': native['node_f1'], 'native_edge_f1': native['edge_f1'],
+            **({'same_endpoint_chord_common_curve_f1': common['same_endpoint_chord_common_curve_f1']} if score_chords else {}),
             **{k: common[k] for k in ('common_anchor_f1', 'common_branch_f1', 'common_curve_f1',
                                       'common_guide_distance_mm', 'common_branch_coverage')}}
 
@@ -96,18 +105,20 @@ def geometry(model, loader, config, output, step, tracker, subset_epoch):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--config', default='configs/spline_weight_pilot.yaml', type=Path)
-    p.add_argument('--arm', required=True, choices=('original', 'reduced'))
+    p.add_argument('--arm', required=True)
     p.add_argument('--smoke', action='store_true', help='Three updates and four validation cases; separate output, no checkpoint')
     args = p.parse_args()
     pilot = yaml.safe_load(args.config.read_text())
+    if args.arm not in pilot['arms']:
+        p.error('Arm must be one of ' + ', '.join(pilot['arms']))
     config = yaml.safe_load(Path(pilot['base_config']).read_text())
-    config['experiment'].update(seed=pilot['seed'], name='spline_weight_pilot_' + args.arm)
+    config['experiment'].update(seed=pilot['seed'], name=pilot.get('name_prefix', 'spline_weight_pilot') + '_' + args.arm)
     config['runtime']['workers'] = 4
     settings = config['data']['datasets']['synthetic_mri']
     settings.update(train_samples=pilot['train_samples'], validation_samples=pilot['validation_samples'],
                     sample_cap_selection='seeded_random', sample_cap_seed=pilot['seed'])
     config['loss']['weights']['spline'] = pilot['arms'][args.arm]
-    config['tracking'].update(enabled=not args.smoke, mode='offline', group='spline-weight-pilot-20261008',
+    config['tracking'].update(enabled=not args.smoke, mode='offline', group=pilot.get('tracking_group', 'spline-weight-pilot-20261008'),
                               tags=['gnbm', 'spline', 'weight-pilot', args.arm])
     assert config['data']['batch_size'] == 4 and not config['data']['train_augmentation']
     assert config['training']['epochs'] == 300 and config['training']['warmup_epochs'] == 1
@@ -134,6 +145,13 @@ def main():
     probe = next(iter(build_evaluation_loader(config, dataset_name='synthetic_mri', split='val', sample_ids=probe_ids)))
     seed(pilot['seed'])
     model = build_model(config)
+    initial_checkpoint = pilot.get('initial_weights')
+    if initial_checkpoint:
+        checkpoint = load_checkpoint_file(initial_checkpoint)
+        assert int(checkpoint['epoch']) == int(pilot['initial_epoch'])
+        del checkpoint
+        report = load_legacy_model_checkpoint(model, initial_checkpoint, allow_missing_spline_head=True)
+        assert report.missing and all(k.startswith('spline_head.') for k in report.missing)
     initial = hashlib.sha256()
     for name, value in sorted(model.state_dict().items()):
         initial.update(name.encode()); initial.update(value.numpy().tobytes())
@@ -145,11 +163,20 @@ def main():
     val_criterion = build_criterion(val_config, model, validation=True).cuda()
     optimizer = build_optimizer(config, model)
     scheduler = build_scheduler(config, optimizer, pilot['schedule_iterations_per_epoch'])
+    schedule_start = int(pilot.get('schedule_start_update', 0))
+    if schedule_start:
+        # New AdamW moments in BOTH continuation arms; keep the LR trajectory
+        # at the source graph checkpoint's update, rather than restarting it.
+        scheduler.step(schedule_start)
     updates = 3 if args.smoke else pilot['updates']
     provenance = {'initial_state_sha256': initial.hexdigest(), 'train_subjects': len(train_subjects),
                   'validation_subjects': len(val_subjects), 'weight': pilot['arms'][args.arm],
                   'updates': updates, 'schedule_updates': 750000, 'warmup_updates': 2500,
                   'bn_recalibration_batches': 0, 'probe_ids': probe_ids,
+                  'initial_checkpoint': initial_checkpoint,
+                  'initial_epoch': pilot.get('initial_epoch', 0),
+                  'schedule_start_update': schedule_start,
+                  'spline_ramp_updates': int(pilot.get('spline_ramp_updates', 0)),
                   'base_config_sha256': hashlib.sha256(Path(pilot['base_config']).read_bytes()).hexdigest()}
     write_json(output / 'provenance.json', provenance)
     tracker = build_tracker(config, output, resume=False, launch_metadata=provenance)
@@ -160,12 +187,13 @@ def main():
     def monitor(step):
         with monitoring_rng():
             row = {'update': step, 'elapsed_seconds': time.monotonic() - started,
+                   'effective_spline_weight': criterion.weights['spline'],
                    'validation': evaluate_loss(model, val_criterion, val, config, 'cuda'),
                    'sensitivity': sensitivity(model, probe, config)}
             if count:
                 row['training'] = {k: v / count for k, v in sums.items()}
             if step in pilot['geometry_steps'] or (args.smoke and step == updates):
-                row['geometry'] = geometry(model, val, config, output, step, tracker, step // len(train))
+                row['geometry'] = geometry(model, val, config, output, step, tracker, step // len(train), pilot.get('score_chords', False))
         history.append(row)
         with (output / 'history.jsonl').open('a') as handle:
             handle.write(json.dumps(row) + '\n')
@@ -175,6 +203,8 @@ def main():
         print(json.dumps(row), flush=True)
 
     try:
+        if pilot.get('spline_ramp_updates', 0):
+            criterion.weights['spline'] = 0.
         monitor(0)
         iterator = iter(train)
         order_digest = hashlib.sha256()
@@ -186,18 +216,25 @@ def main():
             # Hash actual target batches to verify identical ordering between arms.
             for nodes in batch[2]:
                 order_digest.update(nodes.numpy().tobytes())
+            ramp = int(pilot.get('spline_ramp_updates', 0))
+            criterion.weights['spline'] = pilot['arms'][args.arm] * (min(1., step / ramp) if ramp else 1.)
             losses = train_step(model, criterion, optimizer, scheduler, batch, config, 'cuda',
-                                epoch=1 + (step - 1) // pilot['schedule_iterations_per_epoch'],
-                                iteration=step, total_iterations=750000)
+                                epoch=1 + (schedule_start + step - 1) // pilot['schedule_iterations_per_epoch'],
+                                iteration=schedule_start + step, total_iterations=750000)
             scalars = {k: float(v.detach()) for k, v in losses.items() if torch.is_tensor(v) and v.numel() == 1}
             for k, v in scalars.items():
                 sums[k] = sums.get(k, 0.) + v
             count += 1
             if step == 1:
                 gradients = [p.grad for p in model.spline_head.parameters() if p.grad is not None]
-                assert gradients and all(torch.isfinite(g).all() for g in gradients) and any(g.abs().sum() > 0 for g in gradients)
+                assert gradients and all(torch.isfinite(g).all() for g in gradients)
+                if criterion.weights['spline']:
+                    assert any(g.abs().sum() > 0 for g in gradients)
+                else:
+                    assert all(g.abs().sum() == 0 for g in gradients)
                 print('First forward/loss/backward/update passed', flush=True)
             if tracker and step % 100 == 0:
+                scalars['effective_spline_weight'] = criterion.weights['spline']
                 tracker.log_training(scalars, iteration=step, epoch=1 + (step - 1) // len(train),
                                      learning_rate=optimizer.param_groups[0]['lr'])
             if step % pilot['monitor_interval'] == 0 or step == updates:

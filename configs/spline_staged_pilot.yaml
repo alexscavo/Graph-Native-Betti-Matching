@@ -1,0 +1,21 @@
+# Start from graph learning on the SAME 10k training patches, not external data.
+base_config: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/scratch_spline_k8_10k_300ep/resolved-config.yaml
+population_manifest: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/scratch_comparison_10k_300ep/comparison-manifest.json
+initial_weights: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/scratch_old_graph_10k_300ep/models/best_checkpoint.pt
+initial_epoch: 35
+schedule_start_update: 87500
+output_root: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/staged_pilot_20261008
+name_prefix: spline_staged_pilot
+tracking_group: spline-staged-pilot-20261008
+seed: 364505
+train_samples: 512
+validation_samples: 128
+updates: 5000
+monitor_interval: 500
+geometry_steps: [0, 2500, 5000]
+schedule_iterations_per_epoch: 2500
+spline_ramp_updates: 2500
+score_chords: true
+arms:
+  graph_control: 0.0
+  staged_spline: 1.4739989612791453

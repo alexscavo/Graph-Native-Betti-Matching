@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Export two fixed held-out predictions to standalone, offline 3D viewers."""
+"""Export fixed or explicitly selected held-out predictions to offline 3D viewers."""
 import argparse
 import csv
 import json
@@ -38,16 +38,20 @@ def main():
     parser.add_argument('--run', type=Path, required=True)
     parser.add_argument('--targets', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--selection', choices=('best','final'), help='Checkpoint test subdirectory; omit for historical flat test outputs')
+    parser.add_argument('--sample-id', help='Export one explicit sample, without quality-based selection')
     args = parser.parse_args()
+    test_dir = args.run/'test'/args.selection if args.selection else args.run/'test'
     groups = defaultdict(list)
-    with (args.run/'test/per-patch-metrics.csv').open() as handle:
+    with (test_dir/'per-patch-metrics.csv').open() as handle:
         for row in csv.DictReader(handle):
             sample = row['source_sample_id']
             groups[int(sample.split('_')[1])].append(sample)
     subjects = sorted(groups)[:2]
-    selected = [sorted(groups[p])[len(groups[p])//2] for p in subjects]
+    selected = [args.sample_id] if args.sample_id else [sorted(groups[p])[len(groups[p])//2] for p in subjects]
+    assert all(sample in {s for ids in groups.values() for s in ids} for sample in selected)
     found = {}
-    for row in prediction_records(args.run/'test/predictions.json'):
+    for row in prediction_records(test_dir/'predictions.json'):
         if row['source_sample_id'] in selected:
             found[row['source_sample_id']] = row
         if len(found) == len(selected):
@@ -56,8 +60,11 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     template = (Path(__file__).parent/'spline_test_predictions.html').read_text()
     script = get_plotlyjs()
-    provenance = {'selection': 'Median eligible sample ID within each of the two lowest-ID test subjects; no prediction-quality selection.',
-                  'checkpoint': json.loads((args.run/'test/metadata.json').read_text())['checkpoint'],
+    metadata = json.loads((test_dir/'metadata.json').read_text())
+    provenance = {'selection': ('Explicit sample ID; same fixed example used for earlier held-out viewers, no quality selection.' if args.sample_id else 'Median eligible sample ID within each of the two lowest-ID test subjects; no prediction-quality selection.'),
+                  'checkpoint_selection': args.selection or 'historical validation-selected',
+                  'bn_calibration_batches': metadata['bn_calibration_batches'],
+                  'checkpoint': json.loads((test_dir/'metadata.json').read_text())['checkpoint'],
                   'samples': []}
     for sample in selected:
         prediction = found[sample]
@@ -74,7 +81,10 @@ def main():
                      'target_edges': data['edges'], 'target_curves': data['curves'], 'guides': guides,
                      'prediction': prediction,
                      'mesh': mask_mesh(args.targets/'test/seg'/f'{sample}_seg.nii.gz')}
-        page = template.replace('__PLOTLY__', script).replace('__DATA__', json.dumps(page_data, separators=(',', ':')))
+        example_template = template
+        if args.selection=='final':
+            example_template=example_template.replace('validation-selected checkpoint used in the final test','final epoch-300 checkpoint used in this test')
+        page = example_template.replace('__PLOTLY__', script).replace('__DATA__', json.dumps(page_data, separators=(',', ':')))
         filename = f'{sample}.html'
         (args.output/filename).write_text(page)
         # Compact data supports a static inspection and reproducible checks.

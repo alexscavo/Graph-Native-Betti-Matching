@@ -1,0 +1,15 @@
+# Bounded comparison: only the spline loss weight differs between arms.
+base_config: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/scratch_spline_k8_10k_300ep/resolved-config.yaml
+population_manifest: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/scratch_comparison_10k_300ep/comparison-manifest.json
+output_root: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/weight_pilot_20261008
+seed: 364505
+train_samples: 512
+validation_samples: 128
+updates: 5000
+monitor_interval: 500
+geometry_steps: [2500, 5000]
+# Keep the original 750,000-update schedule and 2,500-update LR warmup.
+schedule_iterations_per_epoch: 2500
+arms:
+  original: 1.4739989612791453
+  reduced: 0.14739989612791453

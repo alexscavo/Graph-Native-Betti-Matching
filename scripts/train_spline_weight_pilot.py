@@ -63,8 +63,8 @@ def sensitivity(model, batch, config):
             'transformer_memory_pair_mae': float((memory[0][0] - memory[0][1]).abs().mean())}
 
 
-def geometry(model, loader, config, output, step, tracker, subset_epoch, score_chords=False):
-    destination = output / f'validation-{step:06d}'
+def geometry(model, loader, config, output, step, tracker, subset_epoch, score_chords=False, split='val'):
+    destination = output / (f'validation-{step:06d}' if split == 'val' else f'train-evaluation-{step:06d}')
     native, _ = evaluate_model(model, loader, config, 'cuda', output_dir=destination)
     records = json.loads((destination / 'predictions.json').read_text())
     assert [r['source_sample_id'] for r in records] == [r.sample_id for r in loader.dataset.records]
@@ -72,12 +72,12 @@ def geometry(model, loader, config, output, step, tracker, subset_epoch, score_c
     common_rows = [dict(sample_id=r['source_sample_id'], **evaluate_common_vessels(
         {'nodes': r['nodes_dhw'], 'edges': r['edges'], 'spline_controls': r['spline_controls'],
          'spline_family': r.get('spline_family', 'bspline')},
-        root / 'val/spline' / (r['source_sample_id'] + '.npz'))) for r in records]
+        root / split / 'spline' / (r['source_sample_id'] + '.npz'))) for r in records]
     common = aggregate_common_vessels(common_rows)
     if score_chords:
         chord_rows = [dict(sample_id=r['source_sample_id'], **evaluate_common_vessels(
             {'nodes': r['nodes_dhw'], 'edges': r['edges']},
-            root / 'val/spline' / (r['source_sample_id'] + '.npz'))) for r in records]
+            root / split / 'spline' / (r['source_sample_id'] + '.npz'))) for r in records]
         chord_summary = aggregate_common_vessels(chord_rows)
         write_json(destination / 'same-endpoint-chords-summary.json', chord_summary)
         common['same_endpoint_chord_common_curve_f1'] = chord_summary['common_curve_f1']
@@ -110,6 +110,7 @@ def main():
     p.add_argument('--smoke', action='store_true', help='Three updates and four validation cases; separate output, no checkpoint')
     args = p.parse_args()
     pilot = yaml.safe_load(args.config.read_text())
+    frozen = bool(pilot.get('freeze_detector', False))
     if args.arm not in pilot['arms']:
         p.error('Arm must be one of ' + ', '.join(pilot['arms']))
     config = yaml.safe_load(Path(pilot['base_config']).read_text())
@@ -141,11 +142,18 @@ def main():
     assert set(train_ids) <= set(original['train_ids']) and set(val_ids) <= set(original['validation_ids'])
     train_subjects = {s.split('_')[1] for s in train_ids}; val_subjects = {s.split('_')[1] for s in val_ids}
     assert train_subjects.isdisjoint(val_subjects) and len(train_subjects) >= 50 and len(val_subjects) >= 10
+    if frozen:
+        prior_manifest = json.loads(Path(pilot['pretraining_manifest']).read_text())
+        prior_train = {s for leaf in prior_manifest['train'] for s in leaf['sample_ids']}
+        assert set(train_ids) <= prior_train
+        assert val_subjects.isdisjoint({s.split('_')[1] for s in prior_train})
     write_json(output / 'dataset-manifest.json', membership)
     # Evaluation needs concrete records, rather than a ConcatDataset wrapper.
     if args.smoke:
         val_ids = val_ids[:4]
     val = build_evaluation_loader(config, dataset_name='synthetic_mri', split='val', sample_ids=val_ids)
+    train_eval = (build_evaluation_loader(config, dataset_name='synthetic_mri', split='train',
+                  sample_ids=train_ids[:4] if args.smoke else train_ids) if frozen else None)
     probe_ids = [val_ids[0], val_ids[-1], val_ids[1], val_ids[-2]]
     probe = next(iter(build_evaluation_loader(config, dataset_name='synthetic_mri', split='val', sample_ids=probe_ids)))
     seed(pilot['seed'])
@@ -161,13 +169,21 @@ def main():
     for name, value in sorted(model.state_dict().items()):
         initial.update(name.encode()); initial.update(value.numpy().tobytes())
     model = model.cuda()
+    frozen_digest = None
+    if frozen:
+        from scripts.frozen_spline_diagnostic import freeze_detector, detector_digest, frozen_step, matched_geometry
+        assert initial_checkpoint and config['model']['matcher']['type'] == 'hungarian'
+        assert config['loss']['spline']['mode'] == 'controls'
+        freeze_detector(model)
+        frozen_digest = detector_digest(model)
     criterion = build_criterion(config, model).cuda()
     val_config = copy.deepcopy(config)
     val_config['loss']['edge']['balancing']['mode'] = 'none'
     val_config['loss']['edge']['candidates']['positive_cap'] = 40
     val_criterion = build_criterion(val_config, model, validation=True).cuda()
     optimizer = build_optimizer(config, model)
-    scheduler = build_scheduler(config, optimizer, pilot['schedule_iterations_per_epoch'])
+    scheduler = (torch.optim.lr_scheduler.LambdaLR(optimizer, lambda _: 1.) if frozen
+                 else build_scheduler(config, optimizer, pilot['schedule_iterations_per_epoch']))
     schedule_start = int(pilot.get('schedule_start_update', 0))
     if schedule_start:
         # New AdamW moments in BOTH continuation arms; keep the LR trajectory
@@ -184,11 +200,19 @@ def main():
                   'spline_ramp_updates': int(pilot.get('spline_ramp_updates', 0)),
                   'image_evidence_scale': pilot.get('image_evidence_scales', {}).get(args.arm),
                   'base_config_sha256': hashlib.sha256(Path(pilot['base_config']).read_bytes()).hexdigest()}
+    if frozen:
+        assert schedule_start == 0 and not pilot.get('spline_ramp_updates', 0)
+        provenance.update(freeze_detector=True,detector_sha256=frozen_digest,
+                          trainable_parameters=[n for n,p in model.named_parameters() if p.requires_grad],
+                          schedule_updates=None,warmup_updates=0,learning_rate=config['training']['optimizer']['base_lr'],
+                          scheduler='constant head-only LR',bn_mode='eval throughout',
+                          pretraining_manifest=pilot['pretraining_manifest'])
     write_json(output / 'provenance.json', provenance)
     tracker = build_tracker(config, output, resume=False, launch_metadata=provenance)
     seed(pilot['seed'])
     history = []; sums = {}; count = 0
     started = time.monotonic()
+    fixed_assignments = {}
 
     def monitor(step):
         with monitoring_rng():
@@ -200,12 +224,27 @@ def main():
                 row['training'] = {k: v / count for k, v in sums.items()}
             if step in pilot['geometry_steps'] or (args.smoke and step == updates):
                 row['geometry'] = geometry(model, val, config, output, step, tracker, step // len(train), pilot.get('score_chords', False))
+                if frozen:
+                    assert detector_digest(model) == frozen_digest, 'Frozen detector parameters or buffers changed'
+                    row['train_geometry'] = geometry(model, train_eval, config, output, step, None, step // len(train), True, split='train')
+                    for label,loader in [('train',train_eval),('val',val)]:
+                        report = matched_geometry(model,val_criterion,loader,config,'cuda')
+                        write_json(output / f'{label}-matched-geometry-{step:06d}.json',report)
+                        report.pop('rows')
+                        row[label+'_matched_geometry'] = report
+                        fixed_assignments.setdefault(label,report['assignment_sha256'])
+                        assert report['assignment_sha256'] == fixed_assignments[label], 'Frozen matching changed'
+                    row['detector_unchanged'] = True
         history.append(row)
         with (output / 'history.jsonl').open('a') as handle:
             handle.write(json.dumps(row) + '\n')
         if tracker:
             tracker.log_validation(row['validation'], iteration=step, epoch=step // len(train))
             tracker.log_metrics(row['sensitivity'], iteration=step, epoch=step // len(train))
+            if frozen and 'train_matched_geometry' in row:
+                tracker.log_metrics({f'{split}_matched/{key}':value for split in ('train','val')
+                                     for key,value in row[split+'_matched_geometry']['all_pairs'].items() if value is not None},
+                                    iteration=step,epoch=step // len(train))
         print(json.dumps(row), flush=True)
 
     try:
@@ -224,7 +263,8 @@ def main():
                 order_digest.update(nodes.numpy().tobytes())
             ramp = int(pilot.get('spline_ramp_updates', 0))
             criterion.weights['spline'] = pilot['arms'][args.arm] * (min(1., step / ramp) if ramp else 1.)
-            losses = train_step(model, criterion, optimizer, scheduler, batch, config, 'cuda',
+            step_function = frozen_step if frozen else train_step
+            losses = step_function(model, criterion, optimizer, scheduler, batch, config, 'cuda',
                                 epoch=1 + (schedule_start + step - 1) // pilot['schedule_iterations_per_epoch'],
                                 iteration=schedule_start + step, total_iterations=750000)
             scalars = {k: float(v.detach()) for k, v in losses.items() if torch.is_tensor(v) and v.numel() == 1}

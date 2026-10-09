@@ -143,7 +143,7 @@ def main():
     membership = {'train': dataset_sample_manifest(train.dataset), 'val': dataset_sample_manifest(val.dataset)}
     train_ids = membership['train'][0]['sample_ids']; val_ids = membership['val'][0]['sample_ids']
     original = json.loads(Path(pilot['population_manifest']).read_text())
-    assert len(train_ids) == 512 and len(val_ids) == 128
+    assert len(train_ids) == pilot['train_samples'] and len(val_ids) == pilot['validation_samples']
     assert set(train_ids) <= set(original['train_ids']) and set(val_ids) <= set(original['validation_ids'])
     train_subjects = {s.split('_')[1] for s in train_ids}; val_subjects = {s.split('_')[1] for s in val_ids}
     assert train_subjects.isdisjoint(val_subjects) and len(train_subjects) >= 50 and len(val_subjects) >= 10
@@ -153,6 +153,19 @@ def main():
         assert set(train_ids) <= prior_train
         assert val_subjects.isdisjoint({s.split('_')[1] for s in prior_train})
     write_json(output / 'dataset-manifest.json', membership)
+    expanded_training = pilot.get('reference_comparison', 'paired') == 'expanded_training'
+    assert pilot.get('reference_comparison', 'paired') in ('paired', 'expanded_training')
+    train_eval_ids = train_ids
+    if expanded_training:
+        assert frozen and pilot.get('reference_run')
+        reference_membership = json.loads((Path(pilot['reference_run']) / 'dataset-manifest.json').read_text())
+        train_eval_ids = reference_membership['train'][0]['sample_ids']
+        assert set(train_eval_ids) < set(train_ids), 'Expected a strict expansion of training membership'
+        assert set(train_ids) == set(original['train_ids']), 'Expected the existing full 10k population'
+        assert membership['val'] == reference_membership['val'], 'Validation membership/order changed'
+    write_json(output / 'evaluation-sample-ids.json', {
+        'train': train_eval_ids[:4] if args.smoke else train_eval_ids,
+        'val': val_ids[:4] if args.smoke else val_ids})
     # Evaluation needs concrete records, rather than a ConcatDataset wrapper.
     if args.smoke:
         val_ids = val_ids[:4]
@@ -160,7 +173,7 @@ def main():
     train_eval = None
     if frozen:
         from scripts.frozen_spline_diagnostic import training_evaluation_loader
-        train_eval = training_evaluation_loader(train, config, train_ids[:4] if args.smoke else train_ids)
+        train_eval = training_evaluation_loader(train, config, train_eval_ids[:4] if args.smoke else train_eval_ids)
     probe_ids = [val_ids[0], val_ids[-1], val_ids[1], val_ids[-2]]
     probe = next(iter(build_evaluation_loader(config, dataset_name='synthetic_mri', split='val', sample_ids=probe_ids)))
     seed(pilot['seed'])
@@ -225,8 +238,15 @@ def main():
         for key in ('initial_state_sha256', 'detector_sha256', 'weight', 'updates', 'learning_rate',
                     'initial_checkpoint', 'base_config_sha256', 'scheduler', 'bn_mode', 'probe_ids'):
             assert provenance[key] == reference['provenance'][key], ('Reference differs', key)
-        assert membership == json.loads((reference_path / 'dataset-manifest.json').read_text())
+        if expanded_training:
+            for key in ('loss_target', 'token_inputs'):
+                assert provenance[key] == reference['provenance'][key], ('Reference differs', key)
+        else:
+            assert membership == json.loads((reference_path / 'dataset-manifest.json').read_text())
         provenance['reference_run'] = str(reference_path)
+        provenance['reference_comparison'] = 'expanded_training' if expanded_training else 'paired'
+        provenance['training_samples'] = len(train_ids)
+        provenance['training_evaluation_samples'] = len(train_eval_ids[:4] if args.smoke else train_eval_ids)
     write_json(output / 'provenance.json', provenance)
     tracker = build_tracker(config, output, resume=False, launch_metadata=provenance)
     seed(pilot['seed'])
@@ -310,8 +330,12 @@ def main():
                 monitor(step); sums = {}; count = 0
         provenance['batch_order_sha256'] = order_digest.hexdigest()
         if reference is not None:
-            assert provenance['batch_order_sha256'] == reference['provenance']['batch_order_sha256'], 'Reference batch order differs'
-            provenance['reference_pairing_verified'] = True
+            if expanded_training:
+                provenance['reference_fixed_conditions_verified'] = True
+                provenance['reference_batch_order_comparable'] = False
+            else:
+                assert provenance['batch_order_sha256'] == reference['provenance']['batch_order_sha256'], 'Reference batch order differs'
+                provenance['reference_pairing_verified'] = True
         provenance['elapsed_seconds'] = time.monotonic() - started
         write_json(output / 'provenance.json', provenance)
         if not args.smoke:

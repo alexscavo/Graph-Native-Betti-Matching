@@ -1,6 +1,6 @@
 # All arms start from the same successful 15k-head-update frozen residual model.
 source_run: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/frozen_followup_20261009/residual_continue
-output_root: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/controlled_unfreeze_20261009
+output_root: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/controlled_unfreeze_20261009_attempt2
 seed: 364505
 updates: 5000
 detector_lr: 0.000007

@@ -20,7 +20,11 @@ def evaluate_common_vessels(prediction, cache_path):
         for controls in prediction['spline_controls']:
             controls=np.asarray(controls,dtype=float); k=len(controls)
             knots=np.r_[np.zeros(4),np.arange(1,k-3)/(k-3),np.ones(4)]
-            curves.append(BSpline(knots,controls,3)(np.linspace(0,1,257))@metric.T)
+            if prediction.get('spline_family', 'bspline') == 'catmull_rom':
+                from scripts.catmull_rom import catmull_rom
+                curves.append(catmull_rom(controls @ metric.T, np.linspace(0,1,257)))
+            else:
+                curves.append(BSpline(knots,controls,3)(np.linspace(0,1,257))@metric.T)
     else:
         curves=[nodes[edge]@metric.T for edge in edges]
     predicted=contract_degree_two(nodes@metric.T,edges,edge_polylines=curves)

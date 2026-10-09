@@ -46,7 +46,11 @@ def evaluate_spline_graph(prediction, cache_path, segmentation, threshold_mm=1.0
             controls = np.asarray(controls)
             k = len(controls)
             knots = np.r_[np.zeros(4), np.arange(1, k-3)/(k-3), np.ones(4)]
-            normalized = BSpline(knots, controls, 3)(np.linspace(0, 1, 257))
+            if prediction.get('spline_family', 'bspline') == 'catmull_rom':
+                from scripts.catmull_rom import catmull_rom
+                normalized = catmull_rom(controls @ metric.T, np.linspace(0, 1, 257)) @ np.linalg.inv(metric).T
+            else:
+                normalized = BSpline(knots, controls, 3)(np.linspace(0, 1, 257))
             curve = normalized @ metric.T
             offsets = target['path_offsets']
             guide = target['full_paths'][offsets[index]:offsets[index+1]] @ metric.T

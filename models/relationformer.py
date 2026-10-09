@@ -91,7 +91,8 @@ class RelationFormer(nn.Module):
             with torch.random.fork_rng(devices=[]):
                 self.spline_head = SplineHead(relation_input_dim, hidden_dim,
                                               spline.get('controls', 8), spline.get('samples', 64),
-                                              spline.get('residual_scale', 'mm'), spline.get('curve_evidence'))
+                                              spline.get('residual_scale', 'mm'), spline.get('curve_evidence'),
+                                              family=spline.get('family', 'bspline'))
         self.domain_adaptation_enabled = bool(
             config.get("domain_adaptation", {}).get("enabled", False)
         )

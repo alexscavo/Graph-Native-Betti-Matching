@@ -95,6 +95,7 @@ class SyntheticMRIDataset(Dataset):
         intensity_transform=None,
         rng=None,
         spline_controls=None,
+        spline_family='bspline',
     ):
         if coordinate_space not in {"normalized", "voxel"}:
             raise ValueError("coordinate_space must be 'normalized' or 'voxel'")
@@ -106,6 +107,7 @@ class SyntheticMRIDataset(Dataset):
         self.coordinate_space = coordinate_space
         self.augment = bool(augment)
         self.spline_controls = spline_controls
+        self.spline_family = spline_family
         if spline_controls is not None and self.augment:
             raise ValueError('Spline baseline requires augmentation off until all geometry transforms are implemented')
         self.rotate_90 = bool(rotate_90)
@@ -168,6 +170,9 @@ class SyntheticMRIDataset(Dataset):
             import numpy as np
             path = record.graph.parent.parent/'spline'/f'{record.sample_id}.npz'
             with np.load(path, allow_pickle=False) as cache:
+                family = str(cache['family'].item()) if 'family' in cache else 'bspline'
+                if family != self.spline_family:
+                    raise ValueError(f'Spline cache family mismatch: {record.sample_id}: {family} != {self.spline_family}')
                 geometry = {key: torch.from_numpy(cache[key].copy()) for key in ('controls','curves','guides','metric')}
                 if not np.allclose(cache['nodes'], nodes.numpy(), atol=1e-6) or not np.array_equal(cache['edges'], edges.numpy()):
                     raise ValueError(f'Spline cache / graph mismatch: {record.sample_id}')

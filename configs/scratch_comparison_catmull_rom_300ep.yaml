@@ -1,0 +1,15 @@
+defaults:
+  - scratch_comparison_spline_300ep.yaml
+experiment:
+  name: scratch_catmull_rom_k8_10k_300ep
+data:
+  datasets:
+    synthetic_mri:
+      spline_family: catmull_rom
+model:
+  spline:
+    family: catmull_rom
+    curve_evidence:
+      enabled: false
+tracking:
+  tags: [gnbm, scratch, catmull-rom-k8, synthetic-mri, paired-10k, 300epochs]

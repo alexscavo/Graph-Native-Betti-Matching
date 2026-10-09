@@ -25,7 +25,7 @@ def main():
     parser.add_argument('--config', default='configs/finetune_spline_v0_10k.yaml')
     parser.add_argument('--data-root', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--initial-weights', type=Path, required=True)
+    parser.add_argument('--initial-weights', type=Path)
     args = parser.parse_args()
     config = copy.deepcopy(load_config(args.config))
     config['data']['datasets']['synthetic_mri']['root'] = str(args.data_root)
@@ -34,7 +34,8 @@ def main():
     train, _ = build_data_loaders(config)
     validation = build_evaluation_loader(config, dataset_name='synthetic_mri', split='val', max_samples=4)
     model = build_model(config).cuda()
-    load_legacy_model_checkpoint(model, args.initial_weights, allow_missing_spline_head=True)
+    if args.initial_weights:
+        load_legacy_model_checkpoint(model, args.initial_weights, allow_missing_spline_head=True)
     criterion = build_criterion(config, model).cuda()
     optimizer = build_optimizer(config, model)
     scheduler = build_scheduler(config, optimizer, len(train))
@@ -43,7 +44,7 @@ def main():
     try:
         for step, batch in enumerate(train, start=1):
             losses = train_step(model, criterion, optimizer, scheduler, batch, config, 'cuda',
-                                epoch=1, iteration=step, total_iterations=50*len(train))
+                                epoch=1, iteration=step, total_iterations=config['training']['epochs']*len(train))
             gradient = sum(float(p.grad.abs().sum()) for p in model.spline_head.parameters() if p.grad is not None)
             assert torch.isfinite(losses['total']) and gradient > 0
             print(f'smoke step={step} total={float(losses["total"])} spline_gradient={gradient}', flush=True)

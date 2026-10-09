@@ -40,11 +40,16 @@ class SplineHead(nn.Module):
     Inputs/outputs are normalized DHW coordinates; metric maps them to physical
     millimetres. No sigmoid/clipping: internal controls may lie outside a patch.
     """
-    def __init__(self, pair_width, hidden_width, controls=8, samples=64, residual_scale='mm', curve_evidence=None):
+    def __init__(self, pair_width, hidden_width, controls=8, samples=64, residual_scale='mm', curve_evidence=None, family='bspline'):
         super().__init__()
         self.controls = int(controls)
         self.residual_scale = residual_scale
+        if family not in ('bspline', 'catmull_rom'):
+            raise ValueError('Unknown spline family')
+        self.family = family
         basis, greville = cubic_basis(self.controls, samples)
+        if family == 'catmull_rom':
+            greville = torch.linspace(0, 1, self.controls)
         self.register_buffer('basis', basis)
         self.register_buffer('greville', greville)
         self.network = nn.Sequential(nn.Linear(pair_width+10, hidden_width), nn.ReLU(),
@@ -73,4 +78,10 @@ class SplineHead(nn.Module):
         controls = torch.cat((physical[:, :1], interior, physical[:, 1:]), dim=1) @ torch.linalg.inv(metric).T
         # Copy endpoints exactly; inverse-affine roundoff must not disconnect edges.
         controls = torch.cat((endpoints[:, :1], controls[:, 1:-1], endpoints[:, 1:]), dim=1)
+        if self.family == 'catmull_rom':
+            from .catmull_rom import catmull_rom
+            t = torch.linspace(0, 1, self.basis.shape[0], device=controls.device, dtype=controls.dtype)
+            curves = catmull_rom(controls @ metric.T, t) @ torch.linalg.inv(metric).T
+            curves = torch.cat((endpoints[:, :1], curves[:, 1:-1], endpoints[:, 1:]), dim=1)
+            return controls, curves
         return controls, self.basis @ controls

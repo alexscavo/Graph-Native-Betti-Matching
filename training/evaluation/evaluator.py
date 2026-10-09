@@ -64,6 +64,7 @@ def _prediction_record(sample_id, source_sample_id, prediction, metrics):
         "edge_scores": _tensor_values(prediction["edge_scores"]),
         **({key: _tensor_values(prediction[key]) for key in ('spline_controls','spline_curves','spline_metric')}
            if 'spline_curves' in prediction else {}),
+        **({'spline_family': prediction.get('spline_family', 'bspline')} if 'spline_curves' in prediction else {}),
         "metrics": metrics,
     }
 

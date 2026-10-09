@@ -134,6 +134,11 @@ def validate_config(config: Mapping[str, Any]) -> None:
             raise ConfigError('loss.weights.spline must be non-negative')
         if config['data']['datasets'].get('synthetic_mri',{}).get('spline_controls') != count:
             raise ConfigError('Spline head and cached target control counts must match')
+        family = spline.get('family', 'bspline')
+        if family not in {'bspline', 'catmull_rom'}:
+            raise ConfigError('model.spline.family must be bspline or catmull_rom')
+        if config['data']['datasets']['synthetic_mri'].get('spline_family', 'bspline') != family:
+            raise ConfigError('Spline head and cached target families must match')
         evidence = spline.get('curve_evidence', {})
         if evidence.get('enabled', False):
             if config['training']['input'] != 'image':

@@ -12,6 +12,7 @@ ROOT=Path('/lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learni
 def score(record):
     sample=record['source_sample_id']; prediction={'nodes':record['nodes_dhw'],'edges':record['edges']}
     if 'spline_controls' in record:prediction['spline_controls']=record['spline_controls']
+    prediction['spline_family'] = record.get('spline_family', 'bspline')
     return {'sample_id':sample,**evaluate_common_vessels(prediction,ROOT/'spline/test/spline'/f'{sample}.npz')}
 
 def main():

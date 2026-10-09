@@ -171,6 +171,7 @@ def infer_graphs(
                 controls = nodes.new_empty((0,spline_head.controls,3))
                 curves = nodes.new_empty((0,len(spline_head.basis),3))
             spline_output = {'spline_controls': controls.cpu(), 'spline_curves': curves.cpu(), 'spline_metric': metric.cpu()}
+            spline_output['spline_family'] = spline_head.family
         graphs.append(
             {
                 "nodes": nodes.detach().cpu(),

@@ -70,7 +70,8 @@ def geometry(model, loader, config, output, step, tracker, subset_epoch, score_c
     assert [r['source_sample_id'] for r in records] == [r.sample_id for r in loader.dataset.records]
     root = Path(config['data']['datasets']['synthetic_mri']['root'])
     common_rows = [dict(sample_id=r['source_sample_id'], **evaluate_common_vessels(
-        {'nodes': r['nodes_dhw'], 'edges': r['edges'], 'spline_controls': r['spline_controls']},
+        {'nodes': r['nodes_dhw'], 'edges': r['edges'], 'spline_controls': r['spline_controls'],
+         'spline_family': r.get('spline_family', 'bspline')},
         root / 'val/spline' / (r['source_sample_id'] + '.npz'))) for r in records]
     common = aggregate_common_vessels(common_rows)
     if score_chords:

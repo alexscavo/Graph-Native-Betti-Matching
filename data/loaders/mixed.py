@@ -177,6 +177,7 @@ def _dataset_for_split(
             sample_cap_seed=int(settings.get("sample_cap_seed", 0)),
             patch_selection=str(settings.get("patch_selection", "all")),
             spline_controls=settings.get('spline_controls'),
+            spline_family=settings.get('spline_family', 'bspline'),
             **common,
         )
     raise ValueError(f"Unsupported dataset: {name}")

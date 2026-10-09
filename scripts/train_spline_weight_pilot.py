@@ -120,6 +120,11 @@ def main():
     settings.update(train_samples=pilot['train_samples'], validation_samples=pilot['validation_samples'],
                     sample_cap_selection='seeded_random', sample_cap_seed=pilot['seed'])
     config['loss']['weights']['spline'] = pilot['arms'][args.arm]
+    variant = pilot.get('variants', {}).get(args.arm, {})
+    if variant:
+        assert frozen, 'These diagnostic variants require a frozen detector'
+        config['loss']['spline']['target'] = variant['loss_target']
+        config['model']['spline']['token_inputs'] = variant['token_inputs']
     if 'image_evidence_scales' in pilot:
         config['model']['spline']['curve_evidence'] = dict(
             enabled=True, channels=8, samples=32, chunk_size=256,
@@ -209,6 +214,19 @@ def main():
                           schedule_updates=None,warmup_updates=0,learning_rate=config['training']['optimizer']['base_lr'],
                           scheduler='constant head-only LR',bn_mode='eval throughout',
                           pretraining_manifest=pilot['pretraining_manifest'])
+        provenance.update(loss_target=config['loss']['spline'].get('target', 'absolute'),
+                          token_inputs=config['model']['spline'].get('token_inputs', 'full'))
+    reference = None
+    if pilot.get('reference_run'):
+        reference_path = Path(pilot['reference_run'])
+        if args.smoke:
+            reference_path = reference_path.parent / ('smoke-' + reference_path.name)
+        reference = json.loads((reference_path / 'summary.json').read_text())
+        for key in ('initial_state_sha256', 'detector_sha256', 'weight', 'updates', 'learning_rate',
+                    'initial_checkpoint', 'base_config_sha256', 'scheduler', 'bn_mode', 'probe_ids'):
+            assert provenance[key] == reference['provenance'][key], ('Reference differs', key)
+        assert membership == json.loads((reference_path / 'dataset-manifest.json').read_text())
+        provenance['reference_run'] = str(reference_path)
     write_json(output / 'provenance.json', provenance)
     tracker = build_tracker(config, output, resume=False, launch_metadata=provenance)
     seed(pilot['seed'])
@@ -237,6 +255,9 @@ def main():
                         fixed_assignments.setdefault(label,report['assignment_sha256'])
                         assert report['assignment_sha256'] == fixed_assignments[label], 'Frozen matching changed'
                     row['detector_unchanged'] = True
+                    if reference is not None:
+                        for label in ('train', 'val'):
+                            assert fixed_assignments[label] == reference['initial'][label+'_matched_geometry']['assignment_sha256']
         history.append(row)
         with (output / 'history.jsonl').open('a') as handle:
             handle.write(json.dumps(row) + '\n')
@@ -288,6 +309,9 @@ def main():
             if step % pilot['monitor_interval'] == 0 or step == updates:
                 monitor(step); sums = {}; count = 0
         provenance['batch_order_sha256'] = order_digest.hexdigest()
+        if reference is not None:
+            assert provenance['batch_order_sha256'] == reference['provenance']['batch_order_sha256'], 'Reference batch order differs'
+            provenance['reference_pairing_verified'] = True
         provenance['elapsed_seconds'] = time.monotonic() - started
         write_json(output / 'provenance.json', provenance)
         if not args.smoke:

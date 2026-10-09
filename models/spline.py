@@ -40,13 +40,16 @@ class SplineHead(nn.Module):
     Inputs/outputs are normalized DHW coordinates; metric maps them to physical
     millimetres. No sigmoid/clipping: internal controls may lie outside a patch.
     """
-    def __init__(self, pair_width, hidden_width, controls=8, samples=64, residual_scale='mm', curve_evidence=None, family='bspline'):
+    def __init__(self, pair_width, hidden_width, controls=8, samples=64, residual_scale='mm', curve_evidence=None, family='bspline', token_inputs='full'):
         super().__init__()
         self.controls = int(controls)
         self.residual_scale = residual_scale
         if family not in ('bspline', 'catmull_rom'):
             raise ValueError('Unknown spline family')
         self.family = family
+        if token_inputs not in ('full', 'zero'):
+            raise ValueError('token_inputs must be full or zero')
+        self.token_inputs = token_inputs
         basis, greville = cubic_basis(self.controls, samples)
         if family == 'catmull_rom':
             greville = torch.linspace(0, 1, self.controls)
@@ -66,6 +69,8 @@ class SplineHead(nn.Module):
                     scale=curve_evidence.get('scale', 1.), chunk_size=curve_evidence.get('chunk_size', 256))
 
     def forward(self, pair_features, endpoints, metric):
+        if self.token_inputs == 'zero':
+            pair_features = torch.zeros_like(pair_features)
         physical = endpoints @ metric.T
         chord = physical[:, 1]-physical[:, 0]
         length = chord.norm(dim=-1, keepdim=True)

@@ -30,6 +30,52 @@ class TinyDetector(torch.nn.Module):
 
 
 class FrozenSplineTests(unittest.TestCase):
+    def test_residual_loss_uses_mm_and_removes_direct_endpoint_shift(self):
+        from training.engine import _move_graph_batch
+        cfg,model,criterion,batch = self.fixture()
+        image,targets = _move_graph_batch(batch,'cpu','image',True)
+        tokens,predictions,_ = model(image)
+        assignments = criterion.matcher(predictions,targets)
+        geometry = targets['spline'][0]
+        g = model.spline_head.greville[None,1:-1,None]
+        gt = geometry['controls'];metric = geometry['metric']
+        residual = (gt[:,1:-1]-((1-g)*gt[:,:1]+g*gt[:,-1:])) @ metric.T
+        expected = torch.nn.functional.smooth_l1_loss(residual,torch.zeros_like(residual),beta=1.)
+        criterion.config['loss']['spline']['target'] = 'residual'
+        base = criterion.loss_spline(tokens,predictions,targets,assignments)['spline']
+        shifted = predictions['pred_nodes'].detach().clone()
+        shifted[:,:,:3] += torch.tensor([.03,-.02,.01])
+        shifted.requires_grad_()
+        moved = criterion.loss_spline(tokens,{'pred_nodes':shifted},targets,assignments)['spline']
+        torch.testing.assert_close(base,expected,atol=2e-6,rtol=1e-5)
+        torch.testing.assert_close(moved,base,atol=2e-6,rtol=1e-5)
+        endpoint_grad,bias_grad = torch.autograd.grad(moved,(shifted,model.spline_head.network[-1].bias))
+        self.assertLess(float(endpoint_grad.abs().max()),1e-5)
+        self.assertGreater(float(bias_grad.abs().sum()),0)
+        # With learned residual weights, endpoint FEATURES remain a gradient
+        # route; the frozen diagnostic blocks that route via no_grad forward.
+        with torch.no_grad(): model.spline_head.network[-1].weight.fill_(.01)
+        coupled = criterion.loss_spline(tokens,{'pred_nodes':shifted},targets,assignments)['spline']
+        self.assertGreater(float(torch.autograd.grad(coupled,shifted)[0].abs().sum()),0)
+
+    def test_endpoint_only_head_ignores_tokens_at_train_and_inference(self):
+        torch.manual_seed(7)
+        full = SplineHead(12,16)
+        endpoints_only = SplineHead(12,16,token_inputs='zero')
+        endpoints_only.load_state_dict(full.state_dict())
+        with torch.no_grad():
+            full.network[-1].weight.normal_()
+            endpoints_only.load_state_dict(full.state_dict())
+        endpoints = torch.tensor([[[.1,.2,.3],[.7,.8,.9]]])
+        metric = torch.diag(torch.tensor([-32.,48.,64.]))
+        a,b = torch.randn(1,12),torch.randn(1,12)*5
+        for training in (True,False):
+            endpoints_only.train(training)
+            for x,y in zip(endpoints_only(a,endpoints,metric),endpoints_only(b,endpoints,metric)):
+                torch.testing.assert_close(x,y,atol=0,rtol=0)
+        self.assertGreater(float((full(a,endpoints,metric)[0]-full(b,endpoints,metric)[0]).abs().sum()),0)
+        self.assertEqual(sum(p.numel() for p in full.parameters()),sum(p.numel() for p in endpoints_only.parameters()))
+
     def fixture(self):
         torch.manual_seed(31)
         cfg = load_config('configs/overfit_spline_v0.yaml',environment={'GNBM_OUTPUT_DIR':'/tmp/unused','SYNTHETIC_MRI_DATASET':'/tmp/unused'})

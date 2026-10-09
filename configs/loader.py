@@ -137,6 +137,13 @@ def validate_config(config: Mapping[str, Any]) -> None:
         family = spline.get('family', 'bspline')
         if family not in {'bspline', 'catmull_rom'}:
             raise ConfigError('model.spline.family must be bspline or catmull_rom')
+        if spline.get('token_inputs', 'full') not in {'full', 'zero'}:
+            raise ConfigError('model.spline.token_inputs must be full or zero')
+        target = config['loss']['spline'].get('target', 'absolute')
+        if target not in {'absolute', 'residual'}:
+            raise ConfigError('loss.spline.target must be absolute or residual')
+        if target == 'residual' and (family != 'bspline' or config['loss']['spline']['mode'] != 'controls'):
+            raise ConfigError('Residual supervision requires B-spline control loss')
         if config['data']['datasets']['synthetic_mri'].get('spline_family', 'bspline') != family:
             raise ConfigError('Spline head and cached target families must match')
         evidence = spline.get('curve_evidence', {})

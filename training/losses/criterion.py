@@ -608,6 +608,12 @@ class GraphCriterion(nn.Module):
             dx = (curves-target_curves) @ metric.T
             mode = self.config['loss']['spline']['mode']
             delta = dc if mode=='controls' else dx
+            if self.config['loss']['spline'].get('target', 'absolute') == 'residual':
+                # Replace absolute-control error with error relative to each
+                # graph's own chord. Greville coordinates reproduce B(t)=t.
+                g = self.spline_head.greville[None, 1:-1, None]
+                endpoint_delta = (endpoints-target_controls[:, [0,-1]]) @ metric.T
+                delta = dc - ((1-g)*endpoint_delta[:, :1] + g*endpoint_delta[:, 1:])
             errors.append(F.smooth_l1_loss(delta, torch.zeros_like(delta), beta=float(self.config['loss']['spline'].get('beta_mm',1.)), reduction='none').mean((1,2)))
             control_errors.append(dc.norm(dim=-1).mean(1))
             curve_errors.append(dx.norm(dim=-1).mean(1))

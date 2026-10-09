@@ -1,0 +1,29 @@
+# Three new frozen arms complete a 2x2 diagnostic using the saved absolute/full control.
+base_config: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/scratch_spline_k8_10k_300ep/resolved-config.yaml
+population_manifest: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/scratch_comparison_10k_300ep/comparison-manifest.json
+initial_weights: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/finetune_vessels_full_300ep/models/best_edge_f1_checkpoint.pt
+pretraining_manifest: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/finetune_vessels_full_300ep/dataset-manifest.json
+reference_run: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/frozen_head_pilot_20261009_attempt2/absolute_controls
+initial_epoch: 300
+schedule_start_update: 0
+freeze_detector: true
+output_root: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/frozen_factorial_pilot_20261009
+name_prefix: spline_frozen_factorial
+tracking_group: spline-frozen-factorial-20261009
+seed: 364505
+train_samples: 512
+validation_samples: 128
+updates: 5000
+monitor_interval: 500
+geometry_steps: [0, 1000, 5000]
+schedule_iterations_per_epoch: 2500
+spline_ramp_updates: 0
+score_chords: true
+arms:
+  residual_full: 1.4739989612791453
+  absolute_endpoints: 1.4739989612791453
+  residual_endpoints: 1.4739989612791453
+variants:
+  residual_full: {loss_target: residual, token_inputs: full}
+  absolute_endpoints: {loss_target: absolute, token_inputs: zero}
+  residual_endpoints: {loss_target: residual, token_inputs: zero}

@@ -1,0 +1,9 @@
+population_manifest: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/scratch_comparison_10k_300ep/comparison-manifest.json
+output_root: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/full_validation_20261009
+seed: 364505
+validation_samples: 1952
+visualization_samples: 6
+checkpoints:
+  frozen_residual: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/frozen_followup_20261009/residual_continue/model.pt
+  detached_head: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/controlled_unfreeze_20261009_attempt2/graph_only/model.pt
+  endpoints_detached: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/controlled_unfreeze_20261009_attempt2/tokens_only/model.pt

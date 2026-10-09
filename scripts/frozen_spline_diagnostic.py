@@ -81,7 +81,7 @@ def summarize_pairs(rows):
 
 
 @torch.no_grad()
-def matched_geometry(model, criterion, loader, config, device):
+def matched_geometry(model, criterion, loader, config, device, include_assignments=False):
     """All Hungarian GT-positive pairs, independent of decoded edge selection.
 
     Endpoint-neutral curves are evaluation-only: transfer predicted residuals to
@@ -89,6 +89,7 @@ def matched_geometry(model, criterion, loader, config, device):
     """
     model.eval()
     rows = []
+    assignment_rows = {}
     assignment_hash = hashlib.sha256()
     cursor = 0
     for batch in loader:
@@ -99,6 +100,8 @@ def matched_geometry(model, criterion, loader, config, device):
             record = loader.dataset.records[cursor]; cursor += 1
             assignment_hash.update(record.sample_id.encode())
             assignment_hash.update(source.numpy().tobytes()); assignment_hash.update(target.numpy().tobytes())
+            if include_assignments:
+                assignment_rows[record.sample_id] = dict(zip(map(str, target.tolist()), source.tolist()))
             mapping = dict(zip(target.tolist(),source.tolist()))
             selected = [i for i,(a,c) in enumerate(targets['edges'][b].tolist()) if a in mapping and c in mapping]
             if not selected:
@@ -141,4 +144,5 @@ def matched_geometry(model, criterion, loader, config, device):
                     endpoint_neutral_guide_chord_mm=_distance(gt_chord[j].cpu().numpy(),guide)))
     return {'assignment_sha256':assignment_hash.hexdigest(), 'all_pairs':summarize_pairs(rows),
             'endpoints_within_1mm':summarize_pairs([r for r in rows if r['max_endpoint_mm']<=1.]),
-            'rows':rows}
+            'rows':rows,
+            **({'assignments': assignment_rows} if include_assignments else {})}

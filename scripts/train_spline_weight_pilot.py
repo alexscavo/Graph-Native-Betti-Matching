@@ -111,6 +111,9 @@ def main():
     args = p.parse_args()
     pilot = yaml.safe_load(args.config.read_text())
     frozen = bool(pilot.get('freeze_detector', False))
+    continuation = bool(pilot.get('continuation_checkpoint'))
+    if continuation:
+        assert frozen and pilot.get('reference_run')
     if args.arm not in pilot['arms']:
         p.error('Arm must be one of ' + ', '.join(pilot['arms']))
     config = yaml.safe_load(Path(pilot['base_config']).read_text())
@@ -156,6 +159,12 @@ def main():
     expanded_training = pilot.get('reference_comparison', 'paired') == 'expanded_training'
     assert pilot.get('reference_comparison', 'paired') in ('paired', 'expanded_training')
     train_eval_ids = train_ids
+    if pilot.get('evaluation_membership_run'):
+        assert frozen and not expanded_training
+        evaluation_ids = json.loads((Path(pilot['evaluation_membership_run']) / 'evaluation-sample-ids.json').read_text())
+        train_eval_ids = evaluation_ids['train']
+        assert set(train_eval_ids) <= set(train_ids)
+        assert evaluation_ids['val'] == val_ids
     if expanded_training:
         assert frozen and pilot.get('reference_run')
         reference_membership = json.loads((Path(pilot['reference_run']) / 'dataset-manifest.json').read_text())
@@ -185,6 +194,13 @@ def main():
         del checkpoint
         report = load_legacy_model_checkpoint(model, initial_checkpoint, allow_missing_spline_head=True)
         assert report.missing and all(k.startswith('spline_head.') for k in report.missing)
+    if continuation:
+        checkpoint = load_checkpoint_file(pilot['continuation_checkpoint'])
+        assert checkpoint.get('cumulative_head_updates', checkpoint['steps']) == pilot['continuation_start_update']
+        for section in ('model', 'loss'):
+            assert checkpoint['config'][section] == config[section], ('Continuation config differs', section)
+        model.load_state_dict(checkpoint['net'], strict=True)
+        del checkpoint
     initial = hashlib.sha256()
     for name, value in sorted(model.state_dict().items()):
         initial.update(name.encode()); initial.update(value.numpy().tobytes())
@@ -229,6 +245,10 @@ def main():
                           pretraining_manifest=pilot['pretraining_manifest'])
         provenance.update(loss_target=config['loss']['spline'].get('target', 'absolute'),
                           token_inputs=config['model']['spline'].get('token_inputs', 'full'))
+    if continuation:
+        provenance.update(continuation_checkpoint=pilot['continuation_checkpoint'],
+                          continuation_start_update=pilot['continuation_start_update'],
+                          optimizer_restart=True, training_shuffle_restart=True)
     reference = None
     if pilot.get('reference_run'):
         reference_path = Path(pilot['reference_run'])
@@ -237,14 +257,17 @@ def main():
         reference = json.loads((reference_path / 'summary.json').read_text())
         for key in ('initial_state_sha256', 'detector_sha256', 'weight', 'updates', 'learning_rate',
                     'initial_checkpoint', 'base_config_sha256', 'scheduler', 'bn_mode', 'probe_ids'):
+            if continuation and key in ('initial_state_sha256', 'updates'):
+                continue
             assert provenance[key] == reference['provenance'][key], ('Reference differs', key)
-        if expanded_training:
+        if expanded_training or continuation:
             for key in ('loss_target', 'token_inputs'):
                 assert provenance[key] == reference['provenance'][key], ('Reference differs', key)
-        else:
+        if not expanded_training:
             assert membership == json.loads((reference_path / 'dataset-manifest.json').read_text())
         provenance['reference_run'] = str(reference_path)
-        provenance['reference_comparison'] = 'expanded_training' if expanded_training else 'paired'
+        provenance['reference_comparison'] = ('weight_continuation' if continuation else
+                                              'expanded_training' if expanded_training else 'paired')
         provenance['training_samples'] = len(train_ids)
         provenance['training_evaluation_samples'] = len(train_eval_ids[:4] if args.smoke else train_eval_ids)
     write_json(output / 'provenance.json', provenance)
@@ -260,6 +283,8 @@ def main():
                    'effective_spline_weight': criterion.weights['spline'],
                    'validation': evaluate_loss(model, val_criterion, val, config, 'cuda'),
                    'sensitivity': sensitivity(model, probe, config)}
+            if continuation:
+                row['cumulative_head_updates'] = pilot['continuation_start_update'] + step
             if count:
                 row['training'] = {k: v / count for k, v in sums.items()}
             if step in pilot['geometry_steps'] or (args.smoke and step == updates):
@@ -330,7 +355,7 @@ def main():
                 monitor(step); sums = {}; count = 0
         provenance['batch_order_sha256'] = order_digest.hexdigest()
         if reference is not None:
-            if expanded_training:
+            if expanded_training or continuation:
                 provenance['reference_fixed_conditions_verified'] = True
                 provenance['reference_batch_order_comparable'] = False
             else:
@@ -339,7 +364,9 @@ def main():
         provenance['elapsed_seconds'] = time.monotonic() - started
         write_json(output / 'provenance.json', provenance)
         if not args.smoke:
-            torch.save({'net': model.state_dict(), 'config': config, 'steps': updates}, output / 'model.pt')
+            torch.save({'net': model.state_dict(), 'config': config, 'steps': updates,
+                        'cumulative_head_updates': pilot.get('continuation_start_update', 0) + updates,
+                        'optimizer': optimizer.state_dict(), 'scheduler': scheduler.state_dict()}, output / 'model.pt')
         write_json(output / 'summary.json', {'arm': args.arm, 'provenance': provenance, 'initial': history[0], 'final': history[-1]})
         if tracker:
             tracker.finish()

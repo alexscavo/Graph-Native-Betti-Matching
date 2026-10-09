@@ -1,10 +1,26 @@
 """Head-only updates and paired geometry diagnostics; no new training objective."""
 import hashlib
+import copy
 import numpy as np
 import torch
 from models.spline import canonical_reverse
 from training.engine import _move_graph_batch
 from metrics.representation_geometry import point_to_polyline_distance, sample_polyline_by_arclength
+
+
+def training_evaluation_loader(train_loader, config, sample_ids):
+    """Evaluate the selected training records without the val/test-only loader."""
+    assert len(train_loader.dataset.datasets) == 1
+    dataset = copy.copy(train_loader.dataset.datasets[0])
+    assert not dataset.augment
+    records = {record.sample_id: record for record in dataset.records}
+    dataset.records = [records[sample_id] for sample_id in sample_ids]
+    return torch.utils.data.DataLoader(
+        dataset, batch_size=config['data'].get('validation_batch_size', config['data']['batch_size']),
+        shuffle=False, num_workers=config['runtime']['workers'],
+        pin_memory=config['runtime']['pin_memory'], collate_fn=train_loader.collate_fn,
+        worker_init_fn=train_loader.worker_init_fn,
+        generator=torch.Generator().manual_seed(config['experiment']['seed']+1))
 
 
 def freeze_detector(model):

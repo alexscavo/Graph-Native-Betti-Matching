@@ -152,8 +152,10 @@ def main():
     if args.smoke:
         val_ids = val_ids[:4]
     val = build_evaluation_loader(config, dataset_name='synthetic_mri', split='val', sample_ids=val_ids)
-    train_eval = (build_evaluation_loader(config, dataset_name='synthetic_mri', split='train',
-                  sample_ids=train_ids[:4] if args.smoke else train_ids) if frozen else None)
+    train_eval = None
+    if frozen:
+        from scripts.frozen_spline_diagnostic import training_evaluation_loader
+        train_eval = training_evaluation_loader(train, config, train_ids[:4] if args.smoke else train_ids)
     probe_ids = [val_ids[0], val_ids[-1], val_ids[1], val_ids[-2]]
     probe = next(iter(build_evaluation_loader(config, dataset_name='synthetic_mri', split='val', sample_ids=probe_ids)))
     seed(pilot['seed'])

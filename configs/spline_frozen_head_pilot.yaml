@@ -6,7 +6,7 @@ pretraining_manifest: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/fi
 initial_epoch: 300
 schedule_start_update: 0
 freeze_detector: true
-output_root: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/frozen_head_pilot_20261009
+output_root: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/frozen_head_pilot_20261009_attempt2
 name_prefix: spline_frozen_head
 tracking_group: spline-frozen-head-pilot-20261009
 seed: 364505

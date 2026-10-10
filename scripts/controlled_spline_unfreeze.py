@@ -97,7 +97,9 @@ def main():
     source = Path(pilot['source_run'])
     source_summary = json.loads((source / 'summary.json').read_text())
     checkpoint = load_checkpoint_file(source / 'model.pt')
-    source_head_updates = checkpoint['cumulative_head_updates']
+    source_head_updates = checkpoint.get('cumulative_head_updates')
+    if source_head_updates is None:
+        source_head_updates = checkpoint['provenance']['source_head_updates'] + checkpoint['steps']
     assert source_head_updates == pilot.get('source_head_updates', 15000)
     config = copy.deepcopy(checkpoint['config'])
     assert config['loss']['spline']['target'] == 'residual'
@@ -134,6 +136,10 @@ def main():
     initial = hashlib.sha256()
     for name, value in sorted(model.state_dict().items()):
         initial.update(name.encode()); initial.update(value.numpy().tobytes())
+    optimizer_state = checkpoint.get('optimizer') if pilot.get('resume_optimizer', False) else None
+    if pilot.get('resume_optimizer', False):
+        assert optimizer_state is not None
+        assert checkpoint['provenance']['arm'] == args.arm
     del checkpoint
     model = model.cuda()
     configure_unfreezing(model)
@@ -149,12 +155,16 @@ def main():
         {'params': [p for n,p in model.named_parameters() if p.requires_grad and not n.startswith('spline_head.')], 'lr': pilot['detector_lr']},
         {'params': list(model.spline_head.parameters()), 'lr': pilot['head_lr']}],
         weight_decay=settings['weight_decay'], eps=settings['epsilon'], betas=tuple(settings['betas']))
+    if optimizer_state is not None:
+        optimizer.load_state_dict(optimizer_state)
+        assert [g['lr'] for g in optimizer.param_groups] == [pilot['detector_lr'], pilot['head_lr']]
+        del optimizer_state
     updates = 3 if args.smoke else pilot['updates']
     provenance = dict(arm=args.arm, source_run=str(source), source_head_updates=source_head_updates,
                       initial_state_sha256=initial.hexdigest(), frozen_state_sha256=frozen_digest,
                       initial_detector_sha256=detector_digest(model), updates=updates, seed=pilot['seed'],
                       detector_lr=pilot['detector_lr'], head_lr=pilot['head_lr'],
-                      optimizer_restart=True, scheduler='constant', model_mode='eval throughout; gradients enabled',
+                      optimizer_restart=not pilot.get('resume_optimizer', False), data_order_restart=True, scheduler='constant', model_mode='eval throughout; gradients enabled',
                       probe_ids=probe_ids, spline_weight=criterion.weights['spline'],
                       trainable_parameters=[n for n,p in model.named_parameters() if p.requires_grad])
     write_json(output / 'provenance.json', provenance)
@@ -202,6 +212,11 @@ def main():
         print(json.dumps(row), flush=True)
 
     try:
+        def save_checkpoint(path, step):
+            torch.save(dict(net=model.state_dict(), config=config, steps=step,
+                            cumulative_head_updates=source_head_updates + step,
+                            optimizer=optimizer.state_dict(), provenance=dict(provenance)), path)
+
         monitor(0)
         seed(pilot['seed'])
         iterator = iter(train); order = hashlib.sha256()
@@ -236,12 +251,13 @@ def main():
                                      iteration=step, epoch=1+(step-1)//len(train), learning_rate=pilot['detector_lr'])
             if step % pilot['monitor_interval'] == 0 or step == updates:
                 monitor(step)
+            if not args.smoke and step in pilot.get('checkpoint_steps', []) and step != updates:
+                save_checkpoint(output / f'model-{step:06d}.pt', step)
         provenance.update(batch_order_sha256=order.hexdigest(), elapsed_seconds=time.monotonic()-started,
                           final_detector_sha256=detector_digest(model))
         write_json(output / 'provenance.json', provenance)
         if not args.smoke:
-            torch.save(dict(net=model.state_dict(), config=config, steps=updates,
-                            optimizer=optimizer.state_dict(), provenance=provenance), output / 'model.pt')
+            save_checkpoint(output / 'model.pt', updates)
         write_json(output / 'summary.json', dict(arm=args.arm, provenance=provenance, initial=history[0], final=history[-1]))
         if tracker: tracker.finish()
     except BaseException:

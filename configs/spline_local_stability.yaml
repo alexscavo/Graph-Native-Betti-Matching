@@ -1,0 +1,13 @@
+evaluation_config: configs/spline_local_unfreeze_full_validation.yaml
+reference_summary: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/local_full_validation_20261010/local_features/summary.json
+output_root: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/local_stability_20261010
+curve_f1_margin: 0.01
+node_f1_margin: 0.01
+shape_error_ratio: 1.05
+seed: 364505
+updates: 25000
+detector_lr: 0.000007
+head_lr: 0.00007
+monitor_interval: 1000
+geometry_steps: [0, 5000, 10000, 15000, 20000, 25000]
+checkpoint_steps: [5000, 15000, 25000]

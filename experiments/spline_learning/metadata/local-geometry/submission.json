@@ -21,5 +21,7 @@
   "dataset_caveat": "Predominantly low-curvature SyntheticMRI; diagnostic strata long >=5mm and fitted tortuosity >1.05. IXI not switched silently.",
   "curvature_audit": "curvature-audit.json",
   "output_root": "/lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/local_geometry_pilot_20261010",
-  "command": "sbatch --parsable --output=experiments/spline_learning/logs/local-geometry-%A_%a.out --error=experiments/spline_learning/logs/local-geometry-%A_%a.err cluster/jean_zay/spline_local_geometry.slurm"
+  "command": "sbatch --parsable --output=experiments/spline_learning/logs/local-geometry-%A_%a.out --error=experiments/spline_learning/logs/local-geometry-%A_%a.err cluster/jean_zay/spline_local_geometry.slurm",
+  "gpu_smoke_status": "All three completed 3 updates with frozen detector unchanged, 2026-10-10",
+  "scheduler_status": "All three running at final submission check"
 }

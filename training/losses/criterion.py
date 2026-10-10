@@ -599,7 +599,10 @@ class GraphCriterion(nn.Module):
             endpoints = predictions['pred_nodes'][batch, pairs, :3]
             relation = tokens[batch, self.object_queries:self.object_queries+self.relation_tokens]
             features = self._relation_features(tokens[batch, :self.object_queries], relation, pairs)
-            controls, curves = self.spline_head(features, endpoints, metric)
+            local = ({'local_features': predictions['spline_local_features'][batch],
+                      'input_shape': predictions['spline_input_shape']}
+                     if self.spline_head.local_geometry is not None else {})
+            controls, curves = self.spline_head(features, endpoints, metric, **local)
             target_controls = geometry['controls'][selected].clone()
             target_curves = geometry['curves'][selected].clone()
             target_controls[reverse] = target_controls[reverse].flip(1)

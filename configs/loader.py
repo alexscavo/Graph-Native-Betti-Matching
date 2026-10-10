@@ -147,6 +147,16 @@ def validate_config(config: Mapping[str, Any]) -> None:
         if config['data']['datasets']['synthetic_mri'].get('spline_family', 'bspline') != family:
             raise ConfigError('Spline head and cached target families must match')
         evidence = spline.get('curve_evidence', {})
+        local = spline.get('local_geometry', {})
+        if local.get('enabled', False):
+            if config['training']['input'] != 'image' or family != 'bspline' or evidence.get('enabled', False):
+                raise ConfigError('Local geometry requires MRI B-splines without curve-evidence edge scoring')
+            if local.get('image_mode', 'full') not in {'full', 'zero'}:
+                raise ConfigError('local_geometry.image_mode must be full or zero')
+            for key, default in (('channels', 64), ('samples', 32)):
+                _positive_int(local.get(key, default), 'local_geometry.' + key)
+            if int(local.get('samples', 32)) < 2 or float(local.get('scale', 1.)) not in {0., 1.}:
+                raise ConfigError('Local geometry diagnostic needs >=2 samples and scale 0 or 1')
         if evidence.get('enabled', False):
             if config['training']['input'] != 'image':
                 raise ConfigError('Curve evidence requires MRI image input, never a target segmentation')

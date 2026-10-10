@@ -40,7 +40,7 @@ class SplineHead(nn.Module):
     Inputs/outputs are normalized DHW coordinates; metric maps them to physical
     millimetres. No sigmoid/clipping: internal controls may lie outside a patch.
     """
-    def __init__(self, pair_width, hidden_width, controls=8, samples=64, residual_scale='mm', curve_evidence=None, family='bspline', token_inputs='full'):
+    def __init__(self, pair_width, hidden_width, controls=8, samples=64, residual_scale='mm', curve_evidence=None, family='bspline', token_inputs='full', local_geometry=None):
         super().__init__()
         self.controls = int(controls)
         self.residual_scale = residual_scale
@@ -61,6 +61,13 @@ class SplineHead(nn.Module):
         # Zero residual starts at an exactly linearly parameterized chord.
         nn.init.zeros_(self.network[-1].weight); nn.init.zeros_(self.network[-1].bias)
         self.curve_evidence = None
+        self.local_geometry = None
+        if local_geometry and local_geometry.get('enabled', False):
+            from .local_spline_geometry import LocalSplineGeometry
+            with torch.random.fork_rng(devices=[]):
+                self.local_geometry = LocalSplineGeometry(controls,
+                    channels=local_geometry.get('channels', 64), samples=local_geometry.get('samples', 32),
+                    scale=local_geometry.get('scale', 1.), image_mode=local_geometry.get('image_mode', 'full'))
         if curve_evidence and curve_evidence.get('enabled', False):
             from .curve_evidence import CurveEvidence
             with torch.random.fork_rng(devices=[]):
@@ -68,7 +75,7 @@ class SplineHead(nn.Module):
                     channels=curve_evidence.get('channels', 8), samples=curve_evidence.get('samples', 32),
                     scale=curve_evidence.get('scale', 1.), chunk_size=curve_evidence.get('chunk_size', 256))
 
-    def forward(self, pair_features, endpoints, metric):
+    def forward(self, pair_features, endpoints, metric, *, local_features=None, input_shape=None):
         if self.token_inputs == 'zero':
             pair_features = torch.zeros_like(pair_features)
         physical = endpoints @ metric.T
@@ -83,6 +90,15 @@ class SplineHead(nn.Module):
         controls = torch.cat((physical[:, :1], interior, physical[:, 1:]), dim=1) @ torch.linalg.inv(metric).T
         # Copy endpoints exactly; inverse-affine roundoff must not disconnect edges.
         controls = torch.cat((endpoints[:, :1], controls[:, 1:-1], endpoints[:, 1:]), dim=1)
+        if self.local_geometry is not None:
+            if local_features is None or input_shape is None:
+                raise ValueError('Local spline geometry requires CNN features and input shape')
+            if self.family != 'bspline':
+                raise ValueError('Local geometry diagnostic requires B-splines')
+            base_curves = self.basis @ controls
+            correction = self.local_geometry(local_features, base_curves, endpoints, metric, input_shape)
+            internal = controls[:, 1:-1] + correction @ torch.linalg.inv(metric).T
+            controls = torch.cat((endpoints[:, :1], internal, endpoints[:, 1:]), dim=1)
         if self.family == 'catmull_rom':
             from .catmull_rom import catmull_rom
             t = torch.linspace(0, 1, self.basis.shape[0], device=controls.device, dtype=controls.dtype)

@@ -127,6 +127,9 @@ class FrozenSplineTests(unittest.TestCase):
                 self.assertAlmostEqual(result['all_pairs'][prefix+'_curve_mm'],result['all_pairs'][prefix+'_chord_mm'],places=5)
             repeated = matched_geometry(model,criterion,Loader(),cfg,'cpu')
             self.assertEqual(result['assignment_sha256'],repeated['assignment_sha256'])
+            stratified = matched_geometry(model,criterion,Loader(),cfg,'cpu',curvature_breakdown=True)
+            self.assertEqual(sum(g['branches'] for g in stratified['curvature_groups'].values()),1)
+            self.assertEqual(result['assignment_sha256'],stratified['assignment_sha256'])
 
     def test_greville_chord_identity_and_endpoint_translation_coupling(self):
         basis,g = cubic_basis(8,64)

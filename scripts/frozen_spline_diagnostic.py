@@ -27,7 +27,7 @@ def freeze_detector(model):
     assert model.spline_head.family == 'bspline'
     assert model.spline_head.curve_evidence is None
     for name, parameter in model.named_parameters():
-        parameter.requires_grad_(name.startswith('spline_head.network.'))
+        parameter.requires_grad_(name.startswith(('spline_head.network.', 'spline_head.local_geometry.')))
     model.eval()  # Also freeze BN buffers and disable detector dropout.
     model.spline_head.train()
 
@@ -81,7 +81,7 @@ def summarize_pairs(rows):
 
 
 @torch.no_grad()
-def matched_geometry(model, criterion, loader, config, device, include_assignments=False):
+def matched_geometry(model, criterion, loader, config, device, include_assignments=False, curvature_breakdown=False):
     """All Hungarian GT-positive pairs, independent of decoded edge selection.
 
     Endpoint-neutral curves are evaluation-only: transfer predicted residuals to
@@ -114,7 +114,10 @@ def matched_geometry(model, criterion, loader, config, device, include_assignmen
             endpoints = prediction['pred_nodes'][b,pairs,:3]
             relation = tokens[b,criterion.object_queries:criterion.object_queries+criterion.relation_tokens]
             features = criterion._relation_features(tokens[b,:criterion.object_queries],relation,pairs)
-            controls, curves = model.spline_head(features,endpoints,metric)
+            local = ({'local_features': prediction['spline_local_features'][b],
+                      'input_shape': prediction['spline_input_shape']}
+                     if model.spline_head.local_geometry is not None else {})
+            controls, curves = model.spline_head(features,endpoints,metric,**local)
             gt_controls = geometry['controls'][selected].clone()
             gt_curves = geometry['curves'][selected].clone()
             gt_controls[reverse] = gt_controls[reverse].flip(1)
@@ -137,12 +140,25 @@ def matched_geometry(model, criterion, loader, config, device, include_assignmen
                 paths, offsets = cache['full_paths'] @ metric.cpu().numpy().T, cache['path_offsets']
             for j,i in enumerate(selected):
                 guide = paths[offsets[i]:offsets[i+1]]
-                rows.append(dict(sample_id=record.sample_id,branch=i,max_endpoint_mm=float(endpoint_error[j]),
+                row = dict(sample_id=record.sample_id,branch=i,max_endpoint_mm=float(endpoint_error[j]),
                     fit_curve_mm=float(fit_curve[j]),fit_chord_mm=float(fit_chord[j]),residual_control_mm=float(residual_error[j]),
                     guide_curve_mm=_distance(curve[j].cpu().numpy(),guide),guide_chord_mm=_distance(chord[j].cpu().numpy(),guide),
                     endpoint_neutral_guide_curve_mm=_distance(neutral[j].cpu().numpy(),guide),
-                    endpoint_neutral_guide_chord_mm=_distance(gt_chord[j].cpu().numpy(),guide)))
-    return {'assignment_sha256':assignment_hash.hexdigest(), 'all_pairs':summarize_pairs(rows),
+                    endpoint_neutral_guide_chord_mm=_distance(gt_chord[j].cpu().numpy(),guide))
+                if curvature_breakdown:
+                    gt_curve = gt_curves[j] @ metric.T
+                    length = float((gt_curve[1:]-gt_curve[:-1]).norm(dim=-1).sum())
+                    chord_length = float((gt_curve[-1]-gt_curve[0]).norm())
+                    row.update(gt_fit_length_mm=length, gt_fit_tortuosity=length/max(chord_length,1e-8))
+                rows.append(row)
+    report = {'assignment_sha256':assignment_hash.hexdigest(), 'all_pairs':summarize_pairs(rows),
             'endpoints_within_1mm':summarize_pairs([r for r in rows if r['max_endpoint_mm']<=1.]),
             'rows':rows,
             **({'assignments': assignment_rows} if include_assignments else {})}
+    if curvature_breakdown:
+        report['curvature_groups'] = {
+            'curved_long': summarize_pairs([r for r in rows if r['gt_fit_length_mm']>=5 and r['gt_fit_tortuosity']>1.05]),
+            'near_straight_long': summarize_pairs([r for r in rows if r['gt_fit_length_mm']>=5 and r['gt_fit_tortuosity']<=1.05]),
+            'short': summarize_pairs([r for r in rows if r['gt_fit_length_mm']<5])}
+        report['curvature_group_definition'] = 'GT fitted curve: long >=5 mm; curved tortuosity >1.05. Diagnostic stratification only.'
+    return report

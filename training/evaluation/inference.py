@@ -166,7 +166,10 @@ def infer_graphs(
                 parts = [object_features[batch, query_pairs[:,0]], object_features[batch, query_pairs[:,1]]]
                 if relation_tokens:
                     parts.append(shared_relations[batch].reshape(1,-1).expand(len(pairs),-1))
-                controls, curves = spline_head(torch.cat(parts, dim=-1), nodes[pairs], metric)
+                local = ({'local_features': predictions['spline_local_features'][batch],
+                          'input_shape': predictions['spline_input_shape']}
+                         if spline_head.local_geometry is not None else {})
+                controls, curves = spline_head(torch.cat(parts, dim=-1), nodes[pairs], metric, **local)
             else:
                 controls = nodes.new_empty((0,spline_head.controls,3))
                 curves = nodes.new_empty((0,len(spline_head.basis),3))

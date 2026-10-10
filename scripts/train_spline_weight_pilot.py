@@ -128,6 +128,10 @@ def main():
         assert frozen, 'These diagnostic variants require a frozen detector'
         config['loss']['spline']['target'] = variant['loss_target']
         config['model']['spline']['token_inputs'] = variant['token_inputs']
+    if pilot.get('local_geometry_variants'):
+        assert frozen and continuation
+        config['model']['spline']['local_geometry'] = dict(
+            enabled=True, channels=64, samples=32, **pilot['local_geometry_variants'][args.arm])
     if 'image_evidence_scales' in pilot:
         config['model']['spline']['curve_evidence'] = dict(
             enabled=True, channels=8, samples=32, chunk_size=256,
@@ -198,8 +202,13 @@ def main():
         checkpoint = load_checkpoint_file(pilot['continuation_checkpoint'])
         assert checkpoint.get('cumulative_head_updates', checkpoint['steps']) == pilot['continuation_start_update']
         for section in ('model', 'loss'):
-            assert checkpoint['config'][section] == config[section], ('Continuation config differs', section)
-        model.load_state_dict(checkpoint['net'], strict=True)
+            compared = copy.deepcopy(config[section])
+            if section == 'model' and pilot.get('local_geometry_variants'):
+                compared['spline'].pop('local_geometry')
+            assert checkpoint['config'][section] == compared, ('Continuation config differs', section)
+        report = model.load_state_dict(checkpoint['net'], strict=False)
+        expected_missing = [n for n in model.state_dict() if n.startswith('spline_head.local_geometry.')]
+        assert set(report.missing_keys) == set(expected_missing) and not report.unexpected_keys, report
         del checkpoint
     initial = hashlib.sha256()
     for name, value in sorted(model.state_dict().items()):
@@ -249,7 +258,12 @@ def main():
         provenance.update(continuation_checkpoint=pilot['continuation_checkpoint'],
                           continuation_start_update=pilot['continuation_start_update'],
                           optimizer_restart=True, training_shuffle_restart=True)
+    if pilot.get('local_geometry_variants'):
+        provenance['local_geometry'] = config['model']['spline']['local_geometry']
     reference = None
+    source_geometry_reference = None
+    if pilot.get('local_geometry_variants'):
+        source_geometry_reference = json.loads((Path(pilot['reference_run'])/'summary.json').read_text())['final']
     if pilot.get('reference_run'):
         reference_path = Path(pilot['reference_run'])
         if args.smoke:
@@ -293,13 +307,20 @@ def main():
                     assert detector_digest(model) == frozen_digest, 'Frozen detector parameters or buffers changed'
                     row['train_geometry'] = geometry(model, train_eval, config, output, step, None, step // len(train), True, split='train')
                     for label,loader in [('train',train_eval),('val',val)]:
-                        report = matched_geometry(model,val_criterion,loader,config,'cuda')
+                        report = matched_geometry(model,val_criterion,loader,config,'cuda',
+                                                  curvature_breakdown=bool(pilot.get('local_geometry_variants')))
                         write_json(output / f'{label}-matched-geometry-{step:06d}.json',report)
                         report.pop('rows')
                         row[label+'_matched_geometry'] = report
                         fixed_assignments.setdefault(label,report['assignment_sha256'])
                         assert report['assignment_sha256'] == fixed_assignments[label], 'Frozen matching changed'
                     row['detector_unchanged'] = True
+                    if source_geometry_reference is not None and step == 0 and not args.smoke:
+                        for label in ('geometry', 'train_geometry'):
+                            for key, value in row[label].items():
+                                previous = source_geometry_reference[label][key]
+                                assert value == previous or (value is not None and previous is not None and
+                                    abs(value-previous) < 1e-5), ('Initial local geometry changed source prediction', label, key)
                     if reference is not None:
                         for label in ('train', 'val'):
                             assert fixed_assignments[label] == reference['initial'][label+'_matched_geometry']['assignment_sha256']
@@ -346,6 +367,14 @@ def main():
                     assert any(g.abs().sum() > 0 for g in gradients)
                 else:
                     assert all(g.abs().sum() == 0 for g in gradients)
+                local = model.spline_head.local_geometry
+                if local is not None:
+                    local_grads = [p.grad for p in local.parameters() if p.grad is not None]
+                    assert local_grads and all(torch.isfinite(g).all() for g in local_grads)
+                    if local.scale:
+                        assert local.scorer[-1].bias.grad.abs().sum() > 0
+                    else:
+                        assert all(g.abs().sum() == 0 for g in local_grads)
                 print('First forward/loss/backward/update passed', flush=True)
             if tracker and step % 100 == 0:
                 scalars['effective_spline_weight'] = criterion.weights['spline']

@@ -1,0 +1,37 @@
+# Frozen geometry comparison: current head, local CNN features, and capacity control.
+base_config: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/scratch_spline_k8_10k_300ep/resolved-config.yaml
+population_manifest: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/scratch_comparison_10k_300ep/comparison-manifest.json
+initial_weights: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/finetune_vessels_full_300ep/models/best_edge_f1_checkpoint.pt
+pretraining_manifest: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/finetune_vessels_full_300ep/dataset-manifest.json
+reference_run: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/frozen_followup_20261009/residual_continue
+evaluation_membership_run: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/frozen_followup_20261009/residual_continue
+reference_comparison: paired
+continuation_checkpoint: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/frozen_followup_20261009/residual_continue/model.pt
+continuation_start_update: 15000
+initial_epoch: 300
+schedule_start_update: 0
+freeze_detector: true
+output_root: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/local_geometry_pilot_20261010
+name_prefix: spline_local_geometry
+tracking_group: spline-local-geometry-20261010
+seed: 364505
+train_samples: 10000
+validation_samples: 128
+updates: 5000
+monitor_interval: 500
+geometry_steps: [0, 1000, 5000]
+schedule_iterations_per_epoch: 2500
+spline_ramp_updates: 0
+score_chords: true
+arms:
+  token_control: 1.4739989612791453
+  local_features: 1.4739989612791453
+  zero_features: 1.4739989612791453
+variants:
+  token_control: {loss_target: residual, token_inputs: full}
+  local_features: {loss_target: residual, token_inputs: full}
+  zero_features: {loss_target: residual, token_inputs: full}
+local_geometry_variants:
+  token_control: {scale: 0.0, image_mode: full}
+  local_features: {scale: 1.0, image_mode: full}
+  zero_features: {scale: 1.0, image_mode: zero}

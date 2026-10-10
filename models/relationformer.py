@@ -93,7 +93,16 @@ class RelationFormer(nn.Module):
                                               spline.get('controls', 8), spline.get('samples', 64),
                                               spline.get('residual_scale', 'mm'), spline.get('curve_evidence'),
                                               family=spline.get('family', 'bspline'),
-                                              token_inputs=spline.get('token_inputs', 'full'))
+                                              token_inputs=spline.get('token_inputs', 'full'),
+                                              local_geometry=spline.get('local_geometry'))
+        self._spline_local_features = None
+        if self.spline_head is not None and self.spline_head.local_geometry is not None:
+            # Capture early features before SENet max pooling; this adds no
+            # CNN computation or trainable image encoder.
+            assert hasattr(self.encoder.layer0, 'relu1') and self.encoder.layer0.conv1.stride == (2, 2, 2)
+            assert self.encoder.layer0.conv1.kernel_size == (7, 7, 7) and self.encoder.layer0.conv1.padding == (3, 3, 3)
+            assert self.encoder.layer0.bn1.num_features == spline['local_geometry'].get('channels', 64)
+            self.encoder.layer0.relu1.register_forward_hook(self._capture_local_features)
         self.domain_adaptation_enabled = bool(
             config.get("domain_adaptation", {}).get("enabled", False)
         )
@@ -105,6 +114,9 @@ class RelationFormer(nn.Module):
             self.instance_domain_discriminator = DomainDiscriminator(
                 hidden_dim * self.num_queries, hidden_size=domain_width
             )
+
+    def _capture_local_features(self, module, inputs, output):
+        self._spline_local_features = output
 
     def forward(
         self, samples: torch.Tensor, domain_alpha: float = 1.0
@@ -141,6 +153,9 @@ class RelationFormer(nn.Module):
         }
         if self.spline_head is not None and self.spline_head.curve_evidence is not None:
             predictions['curve_image_features'] = self.spline_head.curve_evidence.encode(samples)
+        if self.spline_head is not None and self.spline_head.local_geometry is not None:
+            predictions['spline_local_features'] = self._spline_local_features
+            predictions['spline_input_shape'] = tuple(samples.shape[-3:])
         if self.node_type_embed is not None:
             predictions["pred_node_types"] = self.node_type_embed(object_tokens)
         if self.domain_adaptation_enabled:

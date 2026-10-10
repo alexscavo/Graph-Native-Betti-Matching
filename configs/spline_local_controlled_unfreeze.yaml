@@ -1,0 +1,13 @@
+# Continue the successful local-image geometry head; matched graph-only control.
+source_run: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/local_geometry_pilot_20261010/local_features
+source_head_updates: 20000
+output_root: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/local_controlled_unfreeze_20261010
+tracking_group: spline-local-unfreeze-20261010
+seed: 364505
+updates: 5000
+detector_lr: 0.000007
+head_lr: 0.00007
+monitor_interval: 500
+geometry_steps: [0, 1000, 5000]
+curvature_breakdown: true
+arms: [graph_only, tokens_only, joint]

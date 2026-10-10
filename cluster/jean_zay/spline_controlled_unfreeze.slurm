@@ -18,8 +18,9 @@ export XDG_CACHE_HOME="$GNBM_REPO_DIR/.cache" MPLCONFIGDIR="$GNBM_REPO_DIR/.cach
 source cluster/jean_zay/env.sh
 source cluster/jean_zay/stage_spline_runtime.sh
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
+config="${DIAGNOSTIC_CONFIG:-configs/spline_controlled_unfreeze.yaml}"
 arms=(graph_only tokens_only joint)
 arm="${arms[$SLURM_ARRAY_TASK_ID]}"
 python -m unittest -v tests.test_controlled_spline_unfreeze.ControlledUnfreezeTests
-python -u scripts/controlled_spline_unfreeze.py --arm "$arm" --smoke
-python -u scripts/controlled_spline_unfreeze.py --arm "$arm"
+python -u scripts/controlled_spline_unfreeze.py --config "$config" --arm "$arm" --smoke
+python -u scripts/controlled_spline_unfreeze.py --config "$config" --arm "$arm"

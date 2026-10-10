@@ -23,5 +23,5 @@
   "output_root": "/lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/local_geometry_pilot_20261010",
   "command": "sbatch --parsable --output=experiments/spline_learning/logs/local-geometry-%A_%a.out --error=experiments/spline_learning/logs/local-geometry-%A_%a.err cluster/jean_zay/spline_local_geometry.slurm",
   "gpu_smoke_status": "All three completed 3 updates with frozen detector unchanged, 2026-10-10",
-  "scheduler_status": "All three running at final submission check"
+  "scheduler_status": "All three COMPLETED, exit 0:0; elapsed 14:53 / 15:28 / 14:48"
 }

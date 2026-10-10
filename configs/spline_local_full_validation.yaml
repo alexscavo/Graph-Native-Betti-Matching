@@ -1,0 +1,11 @@
+population_manifest: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/scratch_comparison_10k_300ep/comparison-manifest.json
+output_root: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/local_full_validation_20261010
+tracking_group: spline-local-full-validation-20261010
+seed: 364505
+validation_samples: 1952
+visualization_samples: 6
+curvature_breakdown: true
+checkpoints:
+  token_control: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/local_geometry_pilot_20261010/token_control/model.pt
+  local_features: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/local_geometry_pilot_20261010/local_features/model.pt
+  zero_features: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/local_geometry_pilot_20261010/zero_features/model.pt

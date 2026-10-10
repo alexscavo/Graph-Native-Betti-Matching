@@ -18,7 +18,8 @@ export XDG_CACHE_HOME="$GNBM_REPO_DIR/.cache" MPLCONFIGDIR="$GNBM_REPO_DIR/.cach
 source cluster/jean_zay/env.sh
 source cluster/jean_zay/stage_spline_runtime.sh
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
-arms=(frozen_residual detached_head endpoints_detached)
+config="${DIAGNOSTIC_CONFIG:-configs/spline_full_validation.yaml}"
+mapfile -t arms < <(python -c 'import sys,yaml; print("\n".join(yaml.safe_load(open(sys.argv[1]))["checkpoints"]))' "$config")
 arm="${arms[$SLURM_ARRAY_TASK_ID]}"
-python -u scripts/evaluate_spline_validation.py --arm "$arm" --smoke
-python -u scripts/evaluate_spline_validation.py --arm "$arm"
+python -u scripts/evaluate_spline_validation.py --config "$config" --arm "$arm" --smoke
+python -u scripts/evaluate_spline_validation.py --config "$config" --arm "$arm"

@@ -97,7 +97,8 @@ def main():
     source = Path(pilot['source_run'])
     source_summary = json.loads((source / 'summary.json').read_text())
     checkpoint = load_checkpoint_file(source / 'model.pt')
-    assert checkpoint['cumulative_head_updates'] == 15000
+    source_head_updates = checkpoint['cumulative_head_updates']
+    assert source_head_updates == pilot.get('source_head_updates', 15000)
     config = copy.deepcopy(checkpoint['config'])
     assert config['loss']['spline']['target'] == 'residual'
     assert config['model']['spline']['token_inputs'] == 'full'
@@ -106,7 +107,7 @@ def main():
     assert not config.get('domain_adaptation', {}).get('enabled', False)
     config['experiment'].update(seed=pilot['seed'], name='spline_unfreeze_' + args.arm)
     config['runtime']['workers'] = 4
-    config['tracking'].update(enabled=not args.smoke, mode='offline', group='spline-unfreeze-20261009')
+    config['tracking'].update(enabled=not args.smoke, mode='offline', group=pilot.get('tracking_group', 'spline-unfreeze-20261009'))
     validate_config(config)
     output = Path(pilot['output_root']) / (('smoke-' if args.smoke else '') + args.arm)
     output.mkdir(parents=True, exist_ok=False)
@@ -149,7 +150,7 @@ def main():
         {'params': list(model.spline_head.parameters()), 'lr': pilot['head_lr']}],
         weight_decay=settings['weight_decay'], eps=settings['epsilon'], betas=tuple(settings['betas']))
     updates = 3 if args.smoke else pilot['updates']
-    provenance = dict(arm=args.arm, source_run=str(source), source_head_updates=15000,
+    provenance = dict(arm=args.arm, source_run=str(source), source_head_updates=source_head_updates,
                       initial_state_sha256=initial.hexdigest(), frozen_state_sha256=frozen_digest,
                       initial_detector_sha256=detector_digest(model), updates=updates, seed=pilot['seed'],
                       detector_lr=pilot['detector_lr'], head_lr=pilot['head_lr'],
@@ -172,7 +173,8 @@ def main():
                     row['train_geometry' if split=='train' else 'geometry'] = geometry(
                         model, loader, config, output, step, tracker if split=='val' else None,
                         step//len(train), True, split=split)
-                    report = matched_geometry(model, val_criterion, loader, config, 'cuda', include_assignments=True)
+                    report = matched_geometry(model, val_criterion, loader, config, 'cuda', include_assignments=True,
+                                              curvature_breakdown=pilot.get('curvature_breakdown', False))
                     write_json(output / f'{split}-matched-geometry-{step:06d}.json', report)
                     current = report.pop('assignments'); report.pop('rows')
                     assignments.setdefault(split, current)

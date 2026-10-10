@@ -119,7 +119,7 @@ def main():
     config['experiment'].update(seed=pilot['seed'],name='full_validation_'+args.arm)
     config['runtime']['workers']=4
     config['data']['datasets']['synthetic_mri']['validation_samples']=1952
-    config['tracking'].update(enabled=not args.smoke,mode='offline',group='spline-full-validation-20261009')
+    config['tracking'].update(enabled=not args.smoke,mode='offline',group=pilot.get('tracking_group', 'spline-full-validation-20261009'))
     validate_config(config)
     output=Path(pilot['output_root'])/(('smoke-' if args.smoke else '')+args.arm)
     output.mkdir(parents=True,exist_ok=False)
@@ -138,7 +138,8 @@ def main():
         geometry(model,loader,config,output,0,tracker,0,True)
         destination=output/'validation-000000'
         criterion=build_criterion(config,model,validation=True).cuda()
-        report=matched_geometry(model,criterion,loader,config,'cuda')
+        report=matched_geometry(model,criterion,loader,config,'cuda',
+                                curvature_breakdown=pilot.get('curvature_breakdown', False))
         write_json(output/'matched-geometry.json',report);report.pop('rows')
         if tracker:
             tracker.log_metrics({'matched/'+k:v for k,v in report['all_pairs'].items() if v is not None},iteration=0,epoch=0)

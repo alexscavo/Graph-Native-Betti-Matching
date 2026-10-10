@@ -6,9 +6,21 @@ from models.matcher import build_matcher
 from scripts.controlled_spline_unfreeze import RoutedCriterion
 from tests.test_frozen_spline_diagnostic import FrozenSplineTests
 from training.engine import train_step
+from scripts.train_spline_weight_pilot import assert_scratch_trainability
 
 
 class ScratchLocalTests(unittest.TestCase):
+    def test_real_decoder_legacy_freeze_is_allowed_but_active_freeze_is_not(self):
+        from models.deformable_transformer import DeformableTransformerDecoderLayer
+        layer = DeformableTransformerDecoderLayer(d_model=24,d_ffn=32,n_levels=1,
+            n_heads=6,n_points=2,rln_attn=True,use_cuda_extension=False)
+        model = torch.nn.Module()
+        model.decoder = layer
+        self.assertEqual(len(assert_scratch_trainability(model)),6)
+        layer.linear1.weight.requires_grad_(False)
+        with self.assertRaises(AssertionError):
+            assert_scratch_trainability(model)
+
     def test_scratch_steps_update_bn_and_only_supervised_geometry(self):
         for weight in (0., 1.4739989612791453):
             with self.subTest(weight=weight):

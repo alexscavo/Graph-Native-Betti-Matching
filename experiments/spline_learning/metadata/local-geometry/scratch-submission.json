@@ -1,17 +1,19 @@
 {
-  "array": 878748,
+  "array": 885337,
   "arms": {
-    "878748_0": "graph_control",
-    "878748_1": "local_spline"
+    "885337_0": "graph_control",
+    "885337_1": "local_spline"
   },
   "initialization": "all modules random; no checkpoint",
   "updates": 25000,
   "train_samples": 10000,
   "validation_samples": 128,
   "train_monitor_samples": 512,
-  "checks": "4 targeted CPU tests, Python/Slurm syntax and diff checks passed",
-  "gpu_smoke": "3 updates per arm before fresh full trial; pending at submission",
+  "checks": "Actual full model passed trainability guard (24 inactive legacy tensors); accidental CNN freeze rejected. Both targeted tests passed, including real decoder regression. Syntax/diff checks passed.",
+  "gpu_smoke": "Pending after resubmission",
   "config": "configs/spline_scratch_local_pilot.yaml",
-  "output_root": "/lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/scratch_local_pilot_20261010",
-  "report": "graph-representation/docs/scratch-local-geometry-diagnostic.md"
+  "output_root": "/lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/scratch_local_pilot_20261010_attempt2",
+  "report": "graph-representation/docs/scratch-local-geometry-diagnostic.md",
+  "failed_array": 878748,
+  "failure": "Prior tasks failed before training: overly broad trainability assertion rejected intentionally inactive legacy decoder parameters"
 }

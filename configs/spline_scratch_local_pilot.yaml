@@ -2,7 +2,7 @@
 base_config: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/scratch_spline_k8_10k_300ep/resolved-config.yaml
 population_manifest: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/scratch_comparison_10k_300ep/comparison-manifest.json
 evaluation_membership_run: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/frozen_followup_20261009/residual_continue
-output_root: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/scratch_local_pilot_20261010
+output_root: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/scratch_local_pilot_20261010_attempt2
 name_prefix: spline_scratch_local
 tracking_group: spline-scratch-local-20261010
 scratch_geometry: true

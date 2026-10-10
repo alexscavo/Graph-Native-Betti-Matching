@@ -103,6 +103,20 @@ def geometry(model, loader, config, output, step, tracker, subset_epoch, score_c
                                       'common_guide_distance_mm', 'common_branch_coverage')}}
 
 
+
+def assert_scratch_trainability(model):
+    # Legacy relation cross-attention is stored for checkpoint compatibility but
+    # deliberately absent from forward(). All active parameters must train.
+    expected = set()
+    for name, module in model.named_modules():
+        if getattr(module, 'rln_attn', False):
+            for child in ('cross_attn2', 'norm12'):
+                expected.update(f'{name}.{child}.{n}' for n, _ in getattr(module, child).named_parameters())
+    frozen = {n for n, p in model.named_parameters() if not p.requires_grad}
+    assert frozen == expected, ('Unexpected scratch trainability', sorted(frozen ^ expected))
+    return sorted(frozen)
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--config', default='configs/spline_weight_pilot.yaml', type=Path)
@@ -230,7 +244,7 @@ def main():
         from scripts.controlled_spline_unfreeze import RoutedCriterion
         from scripts.frozen_spline_diagnostic import matched_geometry
         from models.matcher import build_matcher
-        assert all(p.requires_grad for p in model.parameters())
+        scratch_inactive_parameters = assert_scratch_trainability(model)
         criterion = RoutedCriterion(config, build_matcher(config), model.relation_embed,
                                     spline_head=model.spline_head, route='tokens_only').cuda()
     val_config = copy.deepcopy(config)
@@ -258,6 +272,7 @@ def main():
                   'base_config_sha256': hashlib.sha256(Path(pilot['base_config']).read_bytes()).hexdigest()}
     if scratch_geometry:
         provenance.update(initialization='random_all_modules_no_checkpoint', gradient_route='tokens_only',
+                          inactive_legacy_parameters=scratch_inactive_parameters,
                           bn_mode='train with normal training updates; eval with saved statistics',
                           training_samples=len(train_ids), training_evaluation_samples=len(train_eval_ids))
     if frozen:

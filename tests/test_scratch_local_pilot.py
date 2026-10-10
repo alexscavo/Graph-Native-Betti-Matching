@@ -1,0 +1,43 @@
+"""Real training step: graph-only chords and active local residual supervision."""
+import unittest
+import torch
+from models.local_spline_geometry import LocalSplineGeometry
+from models.matcher import build_matcher
+from scripts.controlled_spline_unfreeze import RoutedCriterion
+from tests.test_frozen_spline_diagnostic import FrozenSplineTests
+from training.engine import train_step
+
+
+class ScratchLocalTests(unittest.TestCase):
+    def test_scratch_steps_update_bn_and_only_supervised_geometry(self):
+        for weight in (0., 1.4739989612791453):
+            with self.subTest(weight=weight):
+                cfg, model, _, batch = FrozenSplineTests().fixture()
+                cfg['loss']['spline']['target'] = 'residual'
+                cfg['loss']['weights']['spline'] = weight
+                model.spline_head.local_geometry = LocalSplineGeometry(8, channels=3, samples=4)
+                original_forward = model.forward
+                def forward(image):
+                    tokens, predictions, features = original_forward(image)
+                    predictions.update(spline_local_features=features[:,:3,::2,::2,::2],
+                                       spline_input_shape=tuple(image.shape[-3:]))
+                    return tokens, predictions, features
+                model.forward = forward
+                criterion = RoutedCriterion(cfg,build_matcher(cfg),model.relation_embed,
+                                            spline_head=model.spline_head,route='tokens_only')
+                optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
+                scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,lambda _:1.)
+                before = model.encoder[1].running_mean.clone()
+                for step in range(1,4):
+                    losses = train_step(model,criterion,optimizer,scheduler,batch,cfg,'cpu',
+                                        epoch=1,iteration=step,total_iterations=750000)
+                    self.assertTrue(torch.isfinite(losses['total']))
+                self.assertFalse(torch.equal(before,model.encoder[1].running_mean))
+                self.assertTrue(all(p.requires_grad for p in model.parameters()))
+                for layer in (model.spline_head.network[-1],model.spline_head.local_geometry.scorer[-1]):
+                    changed = int(torch.count_nonzero(layer.weight)) + int(torch.count_nonzero(layer.bias))
+                    if weight: self.assertGreater(changed,0)
+                    else: self.assertEqual(changed,0)
+
+
+if __name__=='__main__':unittest.main()

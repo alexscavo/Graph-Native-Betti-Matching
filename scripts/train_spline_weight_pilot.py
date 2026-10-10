@@ -111,6 +111,10 @@ def main():
     args = p.parse_args()
     pilot = yaml.safe_load(args.config.read_text())
     frozen = bool(pilot.get('freeze_detector', False))
+    scratch_geometry = bool(pilot.get('scratch_geometry', False))
+    if scratch_geometry:
+        assert not frozen and not pilot.get('initial_weights') and not pilot.get('continuation_checkpoint')
+        assert not pilot.get('schedule_start_update', 0)
     continuation = bool(pilot.get('continuation_checkpoint'))
     if continuation:
         assert frozen and pilot.get('reference_run')
@@ -125,11 +129,11 @@ def main():
     config['loss']['weights']['spline'] = pilot['arms'][args.arm]
     variant = pilot.get('variants', {}).get(args.arm, {})
     if variant:
-        assert frozen, 'These diagnostic variants require a frozen detector'
+        assert frozen or scratch_geometry, 'Variants require frozen or explicit scratch diagnostic'
         config['loss']['spline']['target'] = variant['loss_target']
         config['model']['spline']['token_inputs'] = variant['token_inputs']
     if pilot.get('local_geometry_variants'):
-        assert frozen and continuation
+        assert (frozen and continuation) or scratch_geometry
         config['model']['spline']['local_geometry'] = dict(
             enabled=True, channels=64, samples=32, **pilot['local_geometry_variants'][args.arm])
     if 'image_evidence_scales' in pilot:
@@ -164,7 +168,7 @@ def main():
     assert pilot.get('reference_comparison', 'paired') in ('paired', 'expanded_training')
     train_eval_ids = train_ids
     if pilot.get('evaluation_membership_run'):
-        assert frozen and not expanded_training
+        assert (frozen or scratch_geometry) and not expanded_training
         evaluation_ids = json.loads((Path(pilot['evaluation_membership_run']) / 'evaluation-sample-ids.json').read_text())
         train_eval_ids = evaluation_ids['train']
         assert set(train_eval_ids) <= set(train_ids)
@@ -184,7 +188,7 @@ def main():
         val_ids = val_ids[:4]
     val = build_evaluation_loader(config, dataset_name='synthetic_mri', split='val', sample_ids=val_ids)
     train_eval = None
-    if frozen:
+    if frozen or scratch_geometry:
         from scripts.frozen_spline_diagnostic import training_evaluation_loader
         train_eval = training_evaluation_loader(train, config, train_eval_ids[:4] if args.smoke else train_eval_ids)
     probe_ids = [val_ids[0], val_ids[-1], val_ids[1], val_ids[-2]]
@@ -222,6 +226,13 @@ def main():
         freeze_detector(model)
         frozen_digest = detector_digest(model)
     criterion = build_criterion(config, model).cuda()
+    if scratch_geometry:
+        from scripts.controlled_spline_unfreeze import RoutedCriterion
+        from scripts.frozen_spline_diagnostic import matched_geometry
+        from models.matcher import build_matcher
+        assert all(p.requires_grad for p in model.parameters())
+        criterion = RoutedCriterion(config, build_matcher(config), model.relation_embed,
+                                    spline_head=model.spline_head, route='tokens_only').cuda()
     val_config = copy.deepcopy(config)
     val_config['loss']['edge']['balancing']['mode'] = 'none'
     val_config['loss']['edge']['candidates']['positive_cap'] = 40
@@ -245,6 +256,10 @@ def main():
                   'spline_ramp_updates': int(pilot.get('spline_ramp_updates', 0)),
                   'image_evidence_scale': pilot.get('image_evidence_scales', {}).get(args.arm),
                   'base_config_sha256': hashlib.sha256(Path(pilot['base_config']).read_bytes()).hexdigest()}
+    if scratch_geometry:
+        provenance.update(initialization='random_all_modules_no_checkpoint', gradient_route='tokens_only',
+                          bn_mode='train with normal training updates; eval with saved statistics',
+                          training_samples=len(train_ids), training_evaluation_samples=len(train_eval_ids))
     if frozen:
         assert schedule_start == 0 and not pilot.get('spline_ramp_updates', 0)
         provenance.update(freeze_detector=True,detector_sha256=frozen_digest,
@@ -262,7 +277,7 @@ def main():
         provenance['local_geometry'] = config['model']['spline']['local_geometry']
     reference = None
     source_geometry_reference = None
-    if pilot.get('local_geometry_variants'):
+    if pilot.get('local_geometry_variants') and continuation:
         source_geometry_reference = json.loads((Path(pilot['reference_run'])/'summary.json').read_text())['final']
     if pilot.get('reference_run'):
         reference_path = Path(pilot['reference_run'])
@@ -303,8 +318,9 @@ def main():
                 row['training'] = {k: v / count for k, v in sums.items()}
             if step in pilot['geometry_steps'] or (args.smoke and step == updates):
                 row['geometry'] = geometry(model, val, config, output, step, tracker, step // len(train), pilot.get('score_chords', False))
-                if frozen:
-                    assert detector_digest(model) == frozen_digest, 'Frozen detector parameters or buffers changed'
+                if frozen or scratch_geometry:
+                    if frozen:
+                        assert detector_digest(model) == frozen_digest, 'Frozen detector parameters or buffers changed'
                     row['train_geometry'] = geometry(model, train_eval, config, output, step, None, step // len(train), True, split='train')
                     for label,loader in [('train',train_eval),('val',val)]:
                         report = matched_geometry(model,val_criterion,loader,config,'cuda',
@@ -312,9 +328,11 @@ def main():
                         write_json(output / f'{label}-matched-geometry-{step:06d}.json',report)
                         report.pop('rows')
                         row[label+'_matched_geometry'] = report
-                        fixed_assignments.setdefault(label,report['assignment_sha256'])
-                        assert report['assignment_sha256'] == fixed_assignments[label], 'Frozen matching changed'
-                    row['detector_unchanged'] = True
+                        if frozen:
+                            fixed_assignments.setdefault(label,report['assignment_sha256'])
+                            assert report['assignment_sha256'] == fixed_assignments[label], 'Frozen matching changed'
+                    if frozen:
+                        row['detector_unchanged'] = True
                     if source_geometry_reference is not None and step == 0 and not args.smoke:
                         for label in ('geometry', 'train_geometry'):
                             for key, value in row[label].items():
@@ -330,7 +348,7 @@ def main():
         if tracker:
             tracker.log_validation(row['validation'], iteration=step, epoch=step // len(train))
             tracker.log_metrics(row['sensitivity'], iteration=step, epoch=step // len(train))
-            if frozen and 'train_matched_geometry' in row:
+            if (frozen or scratch_geometry) and 'train_matched_geometry' in row:
                 tracker.log_metrics({f'{split}_matched/{key}':value for split in ('train','val')
                                      for key,value in row[split+'_matched_geometry']['all_pairs'].items() if value is not None},
                                     iteration=step,epoch=step // len(train))
@@ -371,10 +389,13 @@ def main():
                 if local is not None:
                     local_grads = [p.grad for p in local.parameters() if p.grad is not None]
                     assert local_grads and all(torch.isfinite(g).all() for g in local_grads)
-                    if local.scale:
+                    if local.scale and criterion.weights['spline']:
                         assert local.scorer[-1].bias.grad.abs().sum() > 0
                     else:
                         assert all(g.abs().sum() == 0 for g in local_grads)
+                if scratch_geometry:
+                    assert any(p.grad is not None and p.grad.abs().sum() > 0 for p in model.encoder.parameters())
+                    assert all(torch.isfinite(p.grad).all() for p in model.parameters() if p.grad is not None)
                 print('First forward/loss/backward/update passed', flush=True)
             if tracker and step % 100 == 0:
                 scalars['effective_spline_weight'] = criterion.weights['spline']
@@ -382,6 +403,14 @@ def main():
                                      learning_rate=optimizer.param_groups[0]['lr'])
             if step % pilot['monitor_interval'] == 0 or step == updates:
                 monitor(step); sums = {}; count = 0
+            if not args.smoke and step in pilot.get('checkpoint_steps', []) and step != updates:
+                torch.save({'net': model.state_dict(), 'config': config, 'steps': step,
+                            'optimizer': optimizer.state_dict(), 'scheduler': scheduler.state_dict()},
+                           output / f'model-{step:06d}.pt')
+        if scratch_geometry and not pilot['arms'][args.arm]:
+            # Zero-loss control must still decode exact chords after AdamW updates.
+            for layer in (model.spline_head.network[-1], model.spline_head.local_geometry.scorer[-1]):
+                assert torch.count_nonzero(layer.weight) == 0 and torch.count_nonzero(layer.bias) == 0
         provenance['batch_order_sha256'] = order_digest.hexdigest()
         if reference is not None:
             if expanded_training or continuation:

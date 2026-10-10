@@ -1,0 +1,28 @@
+# Random initialization for every module; only geometry supervision differs.
+base_config: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/scratch_spline_k8_10k_300ep/resolved-config.yaml
+population_manifest: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/scratch_comparison_10k_300ep/comparison-manifest.json
+evaluation_membership_run: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/frozen_followup_20261009/residual_continue
+output_root: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/scratch_local_pilot_20261010
+name_prefix: spline_scratch_local
+tracking_group: spline-scratch-local-20261010
+scratch_geometry: true
+seed: 364505
+train_samples: 10000
+validation_samples: 128
+updates: 25000
+monitor_interval: 1000
+geometry_steps: [5000, 15000, 25000]
+checkpoint_steps: [5000, 15000]
+# Preserve original schedule: 2,500-update warmup, 750k horizon; STOP at 25k.
+schedule_iterations_per_epoch: 2500
+spline_ramp_updates: 0
+score_chords: true
+arms:
+  graph_control: 0.0
+  local_spline: 1.4739989612791453
+variants:
+  graph_control: {loss_target: residual, token_inputs: full}
+  local_spline: {loss_target: residual, token_inputs: full}
+local_geometry_variants:
+  graph_control: {scale: 1.0, image_mode: full}
+  local_spline: {scale: 1.0, image_mode: full}

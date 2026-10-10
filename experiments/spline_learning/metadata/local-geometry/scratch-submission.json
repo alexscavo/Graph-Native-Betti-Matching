@@ -1,0 +1,17 @@
+{
+  "array": 878748,
+  "arms": {
+    "878748_0": "graph_control",
+    "878748_1": "local_spline"
+  },
+  "initialization": "all modules random; no checkpoint",
+  "updates": 25000,
+  "train_samples": 10000,
+  "validation_samples": 128,
+  "train_monitor_samples": 512,
+  "checks": "4 targeted CPU tests, Python/Slurm syntax and diff checks passed",
+  "gpu_smoke": "3 updates per arm before fresh full trial; pending at submission",
+  "config": "configs/spline_scratch_local_pilot.yaml",
+  "output_root": "/lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/scratch_local_pilot_20261010",
+  "report": "graph-representation/docs/scratch-local-geometry-diagnostic.md"
+}

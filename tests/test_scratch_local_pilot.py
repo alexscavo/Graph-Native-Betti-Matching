@@ -22,8 +22,10 @@ class ScratchLocalTests(unittest.TestCase):
             assert_scratch_trainability(model)
 
     def test_scratch_steps_update_bn_and_only_supervised_geometry(self):
-        for weight in (0., 1.4739989612791453):
-            with self.subTest(weight=weight):
+        control_state = None
+        for weight, route in ((0., 'tokens_only'), (1.4739989612791453, 'tokens_only'),
+                              (1.4739989612791453, 'graph_only')):
+            with self.subTest(weight=weight, route=route):
                 cfg, model, _, batch = FrozenSplineTests().fixture()
                 cfg['loss']['spline']['target'] = 'residual'
                 cfg['loss']['weights']['spline'] = weight
@@ -36,7 +38,7 @@ class ScratchLocalTests(unittest.TestCase):
                     return tokens, predictions, features
                 model.forward = forward
                 criterion = RoutedCriterion(cfg,build_matcher(cfg),model.relation_embed,
-                                            spline_head=model.spline_head,route='tokens_only')
+                                            spline_head=model.spline_head,route=route)
                 optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
                 scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,lambda _:1.)
                 before = model.encoder[1].running_mean.clone()
@@ -50,6 +52,13 @@ class ScratchLocalTests(unittest.TestCase):
                     changed = int(torch.count_nonzero(layer.weight)) + int(torch.count_nonzero(layer.bias))
                     if weight: self.assertGreater(changed,0)
                     else: self.assertEqual(changed,0)
+                detector_state = {n:v.detach().clone() for n,v in model.state_dict().items()
+                                  if not n.startswith('spline_head.')}
+                if weight == 0.:
+                    control_state = detector_state
+                if route == 'graph_only':
+                    for name, value in detector_state.items():
+                        torch.testing.assert_close(value, control_state[name], atol=0, rtol=0)
 
 
 if __name__=='__main__':unittest.main()

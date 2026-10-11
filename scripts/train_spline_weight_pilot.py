@@ -246,7 +246,7 @@ def main():
         from models.matcher import build_matcher
         scratch_inactive_parameters = assert_scratch_trainability(model)
         criterion = RoutedCriterion(config, build_matcher(config), model.relation_embed,
-                                    spline_head=model.spline_head, route='tokens_only').cuda()
+                                    spline_head=model.spline_head, route=pilot.get('scratch_gradient_route', 'tokens_only')).cuda()
     val_config = copy.deepcopy(config)
     val_config['loss']['edge']['balancing']['mode'] = 'none'
     val_config['loss']['edge']['candidates']['positive_cap'] = 40
@@ -271,7 +271,8 @@ def main():
                   'image_evidence_scale': pilot.get('image_evidence_scales', {}).get(args.arm),
                   'base_config_sha256': hashlib.sha256(Path(pilot['base_config']).read_bytes()).hexdigest()}
     if scratch_geometry:
-        provenance.update(initialization='random_all_modules_no_checkpoint', gradient_route='tokens_only',
+        provenance.update(initialization='random_all_modules_no_checkpoint',
+                          gradient_route=pilot.get('scratch_gradient_route', 'tokens_only'),
                           inactive_legacy_parameters=scratch_inactive_parameters,
                           bn_mode='train with normal training updates; eval with saved statistics',
                           training_samples=len(train_ids), training_evaluation_samples=len(train_eval_ids))
@@ -314,6 +315,26 @@ def main():
                                               'expanded_training' if expanded_training else 'paired')
         provenance['training_samples'] = len(train_ids)
         provenance['training_evaluation_samples'] = len(train_eval_ids[:4] if args.smoke else train_eval_ids)
+    scratch_reference = None
+    if pilot.get('scratch_reference_run'):
+        assert scratch_geometry
+        reference_path = Path(pilot['scratch_reference_run'])
+        if args.smoke:
+            reference_path = reference_path.parent / ('smoke-' + reference_path.name)
+        scratch_reference = json.loads((reference_path / 'summary.json').read_text())
+        for key in ('initial_state_sha256', 'initial_checkpoint', 'updates', 'base_config_sha256',
+                    'probe_ids', 'schedule_updates', 'warmup_updates', 'bn_mode'):
+            assert provenance[key] == scratch_reference['provenance'][key], ('Scratch reference differs', key)
+        assert membership == json.loads((reference_path / 'dataset-manifest.json').read_text())
+        assert json.loads((output/'evaluation-sample-ids.json').read_text()) == json.loads(
+            (reference_path/'evaluation-sample-ids.json').read_text())
+        reference_config = yaml.safe_load((reference_path/'resolved-config.yaml').read_text())
+        for section in ('model', 'data', 'training', 'evaluation'):
+            assert config[section] == reference_config[section], ('Scratch config differs', section)
+        lhs, rhs = copy.deepcopy(config['loss']), copy.deepcopy(reference_config['loss'])
+        lhs['weights'].pop('spline'); rhs['weights'].pop('spline')
+        assert lhs == rhs
+        provenance['scratch_reference_run'] = str(reference_path)
     write_json(output / 'provenance.json', provenance)
     tracker = build_tracker(config, output, resume=False, launch_metadata=provenance)
     seed(pilot['seed'])
@@ -434,6 +455,9 @@ def main():
             else:
                 assert provenance['batch_order_sha256'] == reference['provenance']['batch_order_sha256'], 'Reference batch order differs'
                 provenance['reference_pairing_verified'] = True
+        if scratch_reference is not None:
+            assert provenance['batch_order_sha256'] == scratch_reference['provenance']['batch_order_sha256']
+            provenance['scratch_pairing_verified'] = True
         provenance['elapsed_seconds'] = time.monotonic() - started
         write_json(output / 'provenance.json', provenance)
         if not args.smoke:

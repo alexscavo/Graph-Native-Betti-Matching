@@ -1,0 +1,27 @@
+# Scratch geometry learns while graph detector receives graph gradients only.
+base_config: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/scratch_spline_k8_10k_300ep/resolved-config.yaml
+population_manifest: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/scratch_comparison_10k_300ep/comparison-manifest.json
+evaluation_membership_run: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/frozen_followup_20261009/residual_continue
+output_root: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/scratch_detached_pilot_20261011
+name_prefix: spline_scratch_detached
+tracking_group: spline-scratch-detached-20261011
+scratch_geometry: true
+scratch_gradient_route: graph_only
+scratch_reference_run: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/scratch_local_pilot_20261010_attempt2/graph_control
+seed: 364505
+train_samples: 10000
+validation_samples: 128
+updates: 25000
+monitor_interval: 1000
+geometry_steps: [5000, 15000, 25000]
+checkpoint_steps: [5000, 15000]
+# Preserve original schedule: 2,500-update warmup, 750k horizon; STOP at 25k.
+schedule_iterations_per_epoch: 2500
+spline_ramp_updates: 0
+score_chords: true
+arms:
+  detached_spline: 1.4739989612791453
+variants:
+  detached_spline: {loss_target: residual, token_inputs: full}
+local_geometry_variants:
+  detached_spline: {scale: 1.0, image_mode: full}

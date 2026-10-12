@@ -43,6 +43,13 @@ Do not stay alive waiting for jobs: inspect once, report what exists, finish.
    docs are not in a Git repository. Keep small final result tables/metadata
    tracked; avoid checkpoints,large predictions,galleries or datasets in Git.
    Existing related links should work in the tracked version or be explained.
+   When ALL final results and the completed report are ready, write and track
+   experiments/spline_learning/metadata/local-geometry/scratch-extension-final-results.json
+   with status="complete", validation_samples=1952,
+   training_end_updates={"graph_control":750000,"detached_spline":750000},
+   evaluated_arms=["graph_control_final","graph_control_best","detached_spline_final","detached_spline_best"],
+   and actual result tables/provenance. Do not mark it complete for pending results.
+   This small metadata path is ignored by default: git add -f that exact file.
 6. Commit only the report and task-related stable evidence. Other pre-existing
    dirty files concern a separate IXI experiment; do not stage those. Never use
    git add -A,force push,reset,or overwrite remote work. On representation, inspect

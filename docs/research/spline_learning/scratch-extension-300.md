@@ -264,3 +264,10 @@ repo. CLI uses workspace sandboxing, automatic approval review and network acces
 for the authorized push. Logs and final reply are under
 `experiments/spline_learning/logs/morning-results-<timestamp>.{log,md}`;
 successful complete publication creates `morning-results-20261013.done` there.
+
+Timer/service syntax and the existing resumable session were verified; Codex is
+authenticated. HTTPS push lacked credentials, so configured origin's push URL
+to use the existing verified GitHub SSH identity. The initial stable branch/report
+publication succeeded (`representation` now tracks `origin/representation`). The
+morning completion marker also requires a committed final-results evidence JSON,
+so a previously pushed interim report cannot count as completed publication.

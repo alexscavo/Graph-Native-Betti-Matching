@@ -35,10 +35,20 @@ for arm in ('graph_control_final', 'graph_control_best', 'detached_spline_final'
     path = root / 'full_validation' / arm / 'summary.json'
     if not path.exists() or json.loads(path.read_text())['common']['samples'] != 1952:
         raise SystemExit(1)
+evidence = Path('experiments/spline_learning/metadata/local-geometry/scratch-extension-final-results.json')
+if not evidence.exists(): raise SystemExit(1)
+report = json.loads(evidence.read_text())
+if report.get('status') != 'complete' or report.get('validation_samples') != 1952:
+    raise SystemExit(1)
+if report.get('training_end_updates') != {'graph_control': 750000, 'detached_spline': 750000}:
+    raise SystemExit(1)
+if set(report.get('evaluated_arms', [])) != {'graph_control_final', 'graph_control_best', 'detached_spline_final', 'detached_spline_best'}:
+    raise SystemExit(1)
 PY
 [[ "$(git branch --show-current)" == representation ]]
 git ls-files --error-unmatch docs/research/spline_learning/scratch-extension-300.md >/dev/null
-git diff --quiet HEAD -- docs/research/spline_learning/scratch-extension-300.md
+git ls-files --error-unmatch experiments/spline_learning/metadata/local-geometry/scratch-extension-final-results.json >/dev/null
+git diff --quiet HEAD -- docs/research/spline_learning/scratch-extension-300.md experiments/spline_learning/metadata/local-geometry/scratch-extension-final-results.json
 report_local_head=$(git rev-parse HEAD)
 report_remote_head=$(git ls-remote --heads origin representation | awk '{print $1}')
 [[ "$report_local_head" == "$report_remote_head" ]]

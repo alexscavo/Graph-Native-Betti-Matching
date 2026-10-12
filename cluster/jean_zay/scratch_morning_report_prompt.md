@@ -38,9 +38,11 @@ Do not stay alive waiting for jobs: inspect once, report what exists, finish.
    attribute detector differences causally to detached geometry gradients.
 5. Update graph-representation/docs/scratch-extension-300.md and append the
    results/decisions/next justified steps to spline-learning-report.md. Add a
-   self-contained tracked copy of the completed report at code repo
-   docs/research/spline_learning/scratch-extension-300.md. The outside research
-   docs are not in a Git repository. Keep small final result tables/metadata
+   tracked copy of the ENTIRE graph-representation/docs directory at code repo
+   docs/research/spline_learning/, preserving subfolders. The user subsequently
+   requested all these docs in the repo. Synchronize the report, journal and all
+   associated docs after updating them; the outside research docs are not in a
+   Git repository. Keep small final result tables/metadata
    tracked; avoid checkpoints,large predictions,galleries or datasets in Git.
    Existing related links should work in the tracked version or be explained.
    When ALL final results and the completed report are ready, write and track

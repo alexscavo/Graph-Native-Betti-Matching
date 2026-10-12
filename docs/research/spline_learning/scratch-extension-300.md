@@ -8,7 +8,7 @@ detector. The collapsed token-coupled arm is not extended. The question is wheth
 curvature learning becomes useful as scratch graph localization improves, while
 geometry gradients remain isolated from graph learning.
 
-The preceding [isolation diagnostics](../../../experiments/spline_learning/metadata/local-geometry/scratch-isolation-results.json) verified zero
+The preceding [isolation diagnostics](scratch-detached-geometry.md) verified zero
 detector gradients from the detached geometry objective. This experiment tests
 longer-term learning and stability; it does not identify the exact mechanism of
 the earlier coupled collapse, nor demonstrate that curves improve connectivity.

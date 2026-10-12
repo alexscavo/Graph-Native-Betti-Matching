@@ -1,0 +1,12 @@
+[Unit]
+Description=07:00 paired spline results review with 15:00 maintenance fallback
+
+[Timer]
+OnCalendar=2026-10-13 07:00:00 Europe/Paris
+OnCalendar=2026-10-13 15:00:00 Europe/Paris
+Persistent=true
+AccuracySec=1min
+Unit=gnbm-spline-results-20261013.service
+
+[Install]
+WantedBy=timers.target

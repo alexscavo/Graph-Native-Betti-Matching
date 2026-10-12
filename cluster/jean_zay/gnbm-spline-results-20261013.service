@@ -1,0 +1,9 @@
+[Unit]
+Description=Review final paired spline training results and publish research report
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/lustre/fswork/projects/rech/vnc/upz25mj/projects
+ExecStart=/usr/bin/bash /lustre/fswork/projects/rech/vnc/upz25mj/projects/Graph-Native-Betti-Matching-Representation/cluster/jean_zay/scratch_morning_report.sh
+TimeoutStartSec=60min

@@ -1,0 +1,11 @@
+population_manifest: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/scratch_comparison_10k_300ep/comparison-manifest.json
+output_root: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/scratch_extend300_20261012/full_validation
+seed: 364505
+validation_samples: 1952
+visualization_samples: 6
+tracking_group: spline-scratch-extend300-validation-20261012
+checkpoints:
+  graph_control_final: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/scratch_extend300_20261012/graph_control/epoch300/model.pt
+  graph_control_best: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/scratch_extend300_20261012/graph_control/epoch300/best.pt
+  detached_spline_final: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/scratch_extend300_20261012/detached_spline/epoch300/model.pt
+  detached_spline_best: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/scratch_extend300_20261012/detached_spline/epoch300/best.pt

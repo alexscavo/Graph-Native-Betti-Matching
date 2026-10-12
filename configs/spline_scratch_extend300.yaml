@@ -1,0 +1,14 @@
+# Resume the successful 10-epoch scratch arms to 300 TOTAL epochs.
+output_root: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/scratch_extend300_20261012
+tracking_group: spline-scratch-extend300-20261012
+monitor_epochs: 5
+detailed_epochs: 20
+arms:
+  graph_control:
+    source_run: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/scratch_local_pilot_20261010_attempt2/graph_control
+    route: tokens_only
+    weight: 0.0
+  detached_spline:
+    source_run: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/scratch_detached_pilot_20261011/detached_spline
+    route: graph_only
+    weight: 1.4739989612791453

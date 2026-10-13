@@ -1,0 +1,19 @@
+# 2x2 continuation: original/near-negative loss x relation-only/node-head learning.
+checkpoint: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/scratch_extend300_20261012/detached_spline/epoch300/model.pt
+population_manifest: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/scratch_comparison_10k_300ep/comparison-manifest.json
+evaluation_membership_run: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/frozen_followup_20261009/residual_continue
+baseline_diagnostic: experiments/spline_learning/metadata/metrics/branch-relations-v1/summary.json
+output_root: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/relation_distance_pilot_20261013
+tracking_group: relation-distance-pilot-20261013
+seed: 364505
+updates: 1000
+monitor_interval: 500
+relation_lr: 0.00007
+node_lr: 0.000007
+nearby_radius_mm: 5.0
+nearby_negative_factor: 5.0
+arms:
+  relation_control: {node_learning: false, near_weighting: false}
+  relation_near: {node_learning: false, near_weighting: true}
+  node_control: {node_learning: true, near_weighting: false}
+  node_near: {node_learning: true, near_weighting: true}

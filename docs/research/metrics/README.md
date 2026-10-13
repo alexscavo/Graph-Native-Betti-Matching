@@ -9,6 +9,8 @@
   [CSV table](core-metrics-results.csv): results, model identities and interpretation.
 - [Branch fragmentation and relation-distance diagnostic](branch-connectivity-diagnostic.md):
   endpoint recovery, long relations and nearby false connections in the final models.
+- [Controlled relation / node-head pilot](relation-distance-pilot.md): four arms,
+  supervision, freeze boundaries, evaluation and submission status.
 
 The first comparison uses the saved **final 300-epoch straight graph control and
 detached B-spline model**, on the same 1,952 SyntheticMRI validation patches.

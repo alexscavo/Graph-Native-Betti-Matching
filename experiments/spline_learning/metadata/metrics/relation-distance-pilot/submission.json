@@ -1,0 +1,27 @@
+{
+  "submitted_at": "2026-10-13T20:06:56.876520+02:00",
+  "verification_job": 1026765,
+  "pilot_array": 1026770,
+  "dependency": "afterok:1026765",
+  "arms": [
+    "relation_control",
+    "relation_near",
+    "node_control",
+    "node_near"
+  ],
+  "updates": 1000,
+  "status": "queued; GPU verification and training results pending",
+  "local_checks": {
+    "syntax": "passed",
+    "targeted_tests_passed": 2,
+    "runtime": "protected module Python with loaded PyTorch/MPI libraries"
+  },
+  "output_root": "/lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/relation_distance_pilot_20261013",
+  "source_sha256": {
+    "configs/relation_distance_pilot.yaml": "6a2842ea580ce93a1129ee7d645349f85be86eb02d50c1c87aaa418ed80308d3",
+    "training/losses/relation_distance.py": "100d346439141ab978298bb67e2ca0b1d4547fbc7624f7d5f4525b33506ecfa3",
+    "scripts/train_relation_distance_pilot.py": "58d18985e260034109851426260a1371d68ba8353d86b64df3e64c260574b30b",
+    "tests/vessel/test_relation_distance.py": "a165f0fe5e94189558f90a8999bcab73b5d0df3deb6154117e5103b529a1859f",
+    "cluster/jean_zay/relation_distance_pilot.slurm": "6cf97c32c4994a0e9334fa06764fc29e3242f22c385d35c315f33460a57c42ce"
+  }
+}

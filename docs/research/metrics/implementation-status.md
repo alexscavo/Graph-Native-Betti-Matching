@@ -22,7 +22,7 @@ and compatibility with centerline extraction tools/models for future comparisons
 | Full 1,952-case paired rescore | Completed | CPU array **1019220_0/1**, both exit 0; identical ordered IDs/protocol/GT geometry hash |
 | Full-validation result review and tables | Completed | [Report](core-metrics-results.md), [CSV](core-metrics-results.csv); all 1,952 distance/topology cases valid per model |
 | Branch length / nearby false-link diagnostic | Completed | [Report](branch-connectivity-diagnostic.md); CPU **1024937**, 1,952 paired patches; 3 fixtures and 4-patch smoke passed |
-| Controlled relation-only / node-head intervention | Queued behind verification | [Four-arm pilot](relation-distance-pilot.md); verify **1026765**, array **1026770_0–3**, 1,000 updates; results pending |
+| Controlled relation-only / node-head intervention | GPU verification passed; pilots submitted | [Four-arm pilot](relation-distance-pilot.md); **1026765** completed, all four smokes and paired-state/order checks passed; array **1026770_0–3**, 1,000 updates; full results pending |
 | Curve-aware SMD | Deferred | Existing native SMD is retained as a labelled chord/input-space legacy score |
 | Foreground-mask support / clDice | Deferred | Needs a declared curve-to-mask/radius convention |
 | Curvature derivatives / surface ASSD | Deferred | Noisy guide references and surface/radius requirements |

@@ -126,8 +126,12 @@ or long-relation learning infeasible. Decide extensions after inspecting results
   cancels the pilots. Up to four separate GPUs may run concurrently, subject to
   availability. Each task requests a two-hour maximum, not a duration estimate.
 
-At submission, GPU verification and training results are **pending**, not claimed
-as passed/completed. Compact submission provenance is in
+GPU verification **completed successfully in 3 min 5 s, exit 0**. All four real
+smokes passed. Initial weights, initial decoded metrics and training batch order
+were identical across arms. Frozen state and transformer tokens stayed identical;
+relation-only node outputs stayed identical, while node-head coordinates updated.
+Compact hashes and per-arm verification timings are recorded with the submission.
+The four full pilot results remain **pending**. Compact submission provenance is in
 `experiments/spline_learning/metadata/metrics/relation-distance-pilot/submission.json`.
 
 Outputs:

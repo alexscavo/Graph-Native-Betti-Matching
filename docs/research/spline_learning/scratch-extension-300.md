@@ -271,3 +271,99 @@ to use the existing verified GitHub SSH identity. The initial stable branch/repo
 publication succeeded (`representation` now tracks `origin/representation`). The
 morning completion marker also requires a committed final-results evidence JSON,
 so a previously pushed interim report cannot count as completed publication.
+
+## Final results — 2026-10-13
+
+Both runs completed **300 total epochs / 750,000 updates**, with exit code0.
+Control continuation ended **04:36:27**, detached B-spline **04:04:02** Paris time;
+all four full-validation jobs completed by **04:54:07**, before08:30 maintenance.
+Final continuation elapsed9:10:02 /8:37:37. Together with the initial25k pilots
+and epoch150 stages, total allocated training was approximately18:20 /18:51 per
+arm (single GPU each; approximately37:11 GPU-hours combined, excluding smokes
+and validation). Reducing the continuation allocation to12hours allowed both
+jobs to run before the reservation. No timeout, numerical failure or encoder
+image-sensitivity collapse occurred. Final memory MAE is0.95624 /0.86923.
+
+### Paired full validation: all1,952 patches
+
+Same ordered samples, input/configuration/evaluation protocol and six fixed
+visualization cases; all31,934 Hungarian-matched GT-positive branches evaluated.
+Saved BN statistics, no recalibration; weights/buffers unchanged by evaluation.
+Actual epoch150 and epoch300 training batch-order hashes match across arms.
+These are validation results; the held-out test set was not used.
+
+| model | epoch | node_f1 | edge_f1 | branch_f1 | curve_f1 | chord_curve_f1 | endpoint_neutral_gain |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| graph_control_final | 300 | 0.63383 | 0.51851 | 0.00793 | 0.20201 | 0.20201 | -0.00000 |
+| graph_control_best | 255.00000 | 0.63109 | 0.51635 | 0.00727 | 0.20058 | 0.20058 | -0.00000 |
+| detached_spline_final | 300 | 0.64995 | 0.54195 | 0.01179 | 0.34261 | 0.22633 | -0.04316 |
+| detached_spline_best | 170.00000 | 0.64661 | 0.54407 | 0.01057 | 0.32358 | 0.22413 | 0.02370 |
+
+Positive endpoint-neutral gain means shape error improved over chords after
+transferring predicted curvature to GT endpoints (evaluation only). This measure
+separates shape from localization; decoded curve F1 evaluates complete predicted
+geometry with its predicted nodes/connectivity. They answer different questions.
+
+### Discoveries and limits
+
+1. **Scratch learning is possible with detached geometry.** The previous coupled
+   token-supervision run collapsed, while this isolated residual/local-image
+   setup retained graph learning and image sensitivity for300epochs. This supports
+   harmful early geometry feedback as a cause under the tested setup, without
+   identifying its exact mechanism. BN recalibration is not the explanation
+   supported by the existing diagnostic. A single seed is not proof of robustness.
+2. **Curves improve decoded vessel overlap:** final B-spline curve F10.34261 versus
+   its same-endpoint chords0.22633 (absolute gain0.11628). Final graph-only curve
+   F10.20201. Curvature comparisons within one model hold nodes and edges fixed.
+   Native node/edge differences between models cannot be attributed causally to
+   geometry, because geometry gradients are detached from the detector.
+3. **Geometry overfits.** Final endpoint-neutral shape error on full validation
+   is0.53715mm versus chord0.51493mm (**4.32% worse**), despite a57.64% improvement
+   on the512-case training monitor. The selected spline best checkpoint (epoch170)
+   retains a modest full-validation neutral gain2.37%, whereas its final checkpoint
+   has higher decoded curve F1. More epochs did not uniformly improve shape.
+4. On the **128-case monitoring subset only**, the final model improves neutral
+   shape on193 curved long branches by22.00% (1.30356 vs1.67118mm); near-straight
+   long branches worsen11.36%, and550 short branches worsen117.36%
+   (0.14544 vs0.06691mm). Short branches and subtle bends dominate the aggregate
+   weakness. Full-validation curvature strata were not enabled in this evaluation
+   configuration; do not present the128-case percentages as full-population results.
+5. **Topology is not solved:** final common branch F1 is0.00793/0.01179. The models
+   predict approximately10.91/10.92 common branches per patch versus16.36 targets,
+   and Betti errors remain substantial. Better native edges and curve overlap
+   do not establish accurate complete vessel graphs. Native node boxes and strict
+   spatial branch/anchor correspondence use different matching criteria.
+6. **Best-checkpoint selection is noisy and objective dependent.** Selected control
+   epoch255 and spline epoch170 maximize128-case common branch F1, then native
+   edge F1. These choices do not maximize every full-validation metric; selected
+   spline best has edge F10.54407 vs final0.54195, but curve F10.32358 vs0.34261.
+   Retain both outcomes; do not relabel a different checkpoint as best after
+   inspecting the full validation or test set.
+
+### Next research decisions
+
+- Inspect the gap between native detection and common complete-branch recovery
+  with the existing fixed cases and exact metric/spacing/matching definitions,
+  including boundary, loop and parallel-branch rules, before claiming topology
+  success or changing the architecture.
+- Address shape generalization and short-branch behavior in a bounded comparison;
+  choose geometry checkpoints using an explicit validation geometry objective.
+  Any chord fallback/regularization is a proposal requiring a controlled experiment,
+  not a modification made during this review. Preserve successful detector training.
+- After settling selection and evaluation, use a second seed and the held-out
+  test set for a paper-quality comparison. No additional GPU jobs launched here.
+
+### Artifacts and publication
+
+Full tables and portable six-case HTML gallery: `full_validation/comparison.{csv,md,json,html}`
+under the run root. Best/final models: `<arm>/epoch300/{best.pt,model.pt}`.
+Final compact evidence is tracked at
+`experiments/spline_learning/metadata/local-geometry/scratch-extension-final-results.json`;
+all source summary hashes and the paired audit are recorded there.
+
+The07:00 scheduled reviewer failed immediately because Codex rejects combining
+`--approve-for-me` with explicit`--sandbox`. No model or report ran in that attempt.
+Removed the redundant sandbox flag (automatic approval review already selects
+workspace-write), and completed the authorized documentation/commit/push in this
+active review. No approval/sandbox bypass was introduced. The15:00 fallback will
+skip once the published-completion marker is verified.

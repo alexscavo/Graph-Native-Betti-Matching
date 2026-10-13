@@ -12,7 +12,7 @@ flock -n 9 || exit 0
 cd "$projects_root"
 report_stamp=$(date +%Y%m%d-%H%M%S)
 /linkhome/rech/gendkt01/upz25mj/.local/bin/codex exec \
-    --approve-for-me --sandbox workspace-write \
+    --approve-for-me \
     -c sandbox_workspace_write.network_access=true \
     --cd "$projects_root" --skip-git-repo-check \
     --output-last-message "$report_logs/morning-results-$report_stamp.md" \

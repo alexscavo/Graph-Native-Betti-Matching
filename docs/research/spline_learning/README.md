@@ -55,3 +55,7 @@ The source-health inventory in `archive/` describes the old, disappearing source
 - [Catmull–Rom versus B-spline: existing single cases](catmull-rom-single-cases.md) — offline viewers, equal-budget interpolation points, construction and metrics.
 
 - [Three scratch trainings: completed comparison tables](scratch-comparison-results.md) — final and validation-selected checkpoints, common metrics, native diagnostics, counts and limitations.
+
+## Latest completed scratch comparison
+
+[300-epoch graph-only versus detached B-spline results](scratch-extension-300.md#final-results--2026-10-13): all trainings/evaluations completed; geometry overlap improves without encoder collapse, but shape overfits and complete-branch recovery remains weak.

@@ -21,6 +21,8 @@ and compatibility with centerline extraction tools/models for future comparisons
 | Closed-branch tortuosity | Handled | Exclude undefined ratios and expose count; open matched diagnostic retained |
 | Full 1,952-case paired rescore | Completed | CPU array **1019220_0/1**, both exit 0; identical ordered IDs/protocol/GT geometry hash |
 | Full-validation result review and tables | Completed | [Report](core-metrics-results.md), [CSV](core-metrics-results.csv); all 1,952 distance/topology cases valid per model |
+| Branch length / nearby false-link diagnostic | Completed | [Report](branch-connectivity-diagnostic.md); CPU **1024937**, 1,952 paired patches; 3 fixtures and 4-patch smoke passed |
+| Controlled relation-only intervention | Proposed; not launched | Audit supports short-link preference and missing long relations; isolate relation supervision before changing architecture; localization remains unresolved |
 | Curve-aware SMD | Deferred | Existing native SMD is retained as a labelled chord/input-space legacy score |
 | Foreground-mask support / clDice | Deferred | Needs a declared curve-to-mask/radius convention |
 | Curvature derivatives / surface ASSD | Deferred | Noisy guide references and surface/radius requirements |

@@ -156,12 +156,15 @@ def main():
     parser.add_argument('--run-root', type=Path, default=RUN_ROOT)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--max-samples', type=int)
+    parser.add_argument('--checkpoints', choices=['final', 'best'], default='final')
     args = parser.parse_args()
     if args.max_samples is not None and args.max_samples < 1:
         parser.error('--max-samples must be positive')
+    arms = {key.replace('_final', '_' + args.checkpoints): value.replace('_final', '_' + args.checkpoints)
+            for key, value in ARMS.items()}
     args.output.mkdir(parents=True, exist_ok=False)
     prior = {arm: json.loads((args.run_root/'full_validation'/source/'summary.json').read_text())
-             for arm, source in ARMS.items()}
+             for arm, source in arms.items()}
     first = next(iter(prior.values()))['provenance']
     for value in prior.values():
         assert value['provenance']['sample_ids'] == first['sample_ids']
@@ -189,7 +192,7 @@ def main():
                'Guide alignment: bidirectional sampled HD95 <= matching tolerance, spacing 0.5mm.',
                'Quartiles derive solely from common GT; sensitivity/causality and patch correlation are not controlled.'])
     started = time.monotonic()
-    for arm, source in ARMS.items():
+    for arm, source in arms.items():
         processed = 0
         all_rows = {t: [] for t in (1., 2.)}
         totals = {t: {} for t in all_rows}
@@ -200,7 +203,7 @@ def main():
             assert record['source_sample_id'] == ids[n]
             processed += 1
             gt, metric = reference(target_root/(ids[n]+'.npz'))
-            predicted = VesselGraph.from_prediction(record, metric, curved=arm!='straight_final')
+            predicted = VesselGraph.from_prediction(record, metric, curved=not arm.startswith('straight_'))
             for tolerance in all_rows:
                 counts, rows, pairs = diagnose(predicted, gt, tolerance, arc_cuts, chord_cuts)
                 for key, value in counts.items(): totals[tolerance][key] = totals[tolerance].get(key, 0) + value

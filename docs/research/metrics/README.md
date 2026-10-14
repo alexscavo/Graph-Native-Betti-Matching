@@ -16,3 +16,5 @@ The first comparison uses the saved **final 300-epoch straight graph control and
 detached B-spline model**, on the same 1,952 SyntheticMRI validation patches.
 Legacy results retain their original definitions. The new suite has its own
 version and output directory. No training or model inference is needed.
+
+- [Generalization audit and plant pretraining recovery](generalization-audit.md): earlier vs final checkpoints, split statistics, and next controlled experiment (2026-10-14).

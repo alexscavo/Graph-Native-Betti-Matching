@@ -51,3 +51,22 @@ Dependencies require successful preparation and GPU verification before training
 Machine-readable job IDs: `experiments/plant_pretraining/submissions/20261014.json`.
 Runs: `/lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/plant_generalization_20261014/runs/`.
 Next: inspect first5/10epoch learning/generalization checks; compare matched validation recovery and curvature improvement before deciding extensions or architecture changes.
+
+## Superseding restart: domain adaptation and batch32
+
+User corrected the intended recipe: mixed pretraining must enable domain adaptation; then explicitly selected **domain weight1.0** (overriding legacy0.1) and restart from scratch. Cancelled the original1049725/26/27/28 chain; preserve its outputs as superseded, not continuations. Cancelled provisional0.1verification1068973.
+
+New config: `configs/plant_generalization_da_b32.yaml`. New output root ends `plant_generalization_20261014_da_b32_w1_restart`; no previous-run checkpoint is loaded. Model, optimizer and scheduler start fresh for both pretrainings. Only later stages resume within this new run; fine-tunings initialize from the newly trained detector.
+
+Mixed pretraining enables image and instance adversarial losses plus consistency regularization, domain weight1.0, class weights[.05,.95], domain LR7e-5 and existing alpha ramp. MRI-only control and vessel-only fine-tuning disable the domain objective. The comparison now measures the combined mixed-domain adaptation recipe against MRI-only, not plant data alone. Batch32 is conditional on GPU verification passing; no silent batch fallback.50000draws/epoch gives1563updates including a final16sample batch. Original derived datasets/splits and spline augmentation policy unchanged.
+
+Fresh GPU verification1069024 checks batch32memory/time, finite domain loss and nonzero gradients in both discriminators, then both representation fine-tunings. Two focused domain-loss/config tests passed locally. Skip the costly untrained full initial evaluation for production runs; monitoring begins at epoch5. All regular validation remains unchanged.
+
+Replacement chain:
+
+-1069042_0/1 pretraining to25epochs, afterok1069024.
+-1069043_0/1 pretraining to50epochs, aftercorr1069042.
+-1069044_0..3 fine-tuning to50epochs, afterok1069043.
+-1069045_0..3 fine-tuning to100epochs, aftercorr1069044.
+
+The original completed preparation job aged out of the scheduler dependency window, so submission uses the existing target READY guard rather than a dependency on that historical job. All training still waits for the new GPU check. Machine-readable replacement IDs: `experiments/plant_pretraining/submissions/20261014-da-b32-w1-restart.json`.

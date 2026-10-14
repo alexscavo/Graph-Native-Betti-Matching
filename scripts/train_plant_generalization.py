@@ -47,7 +47,13 @@ def configuration(plan, arm):
     cfg['data']['mixed_sampling'].update(balance_source_target=True,epoch_size='twice_source')
     aug=cfg['augmentation']['synthetic_mri'];aug['rotate_90']['enabled']=True;aug['zoom']['enabled']=False
     aug['gaussian_noise'].update(enabled=True,probability=.35,std_range=[0.,.015]);aug['intensity_clamp']=None
-    cfg['domain_adaptation']['enabled']=False
+    domain=plan.get('domain_adaptation',{})
+    cfg['domain_adaptation'].update(enabled=mixed and domain.get('enabled',False))
+    cfg['loss']['enabled']=[x for x in cfg['loss']['enabled'] if x!='domain']
+    if cfg['domain_adaptation']['enabled']:
+        cfg['domain_adaptation'].update(image_adversarial=True,graph_adversarial=True,consistency_regularization=True,
+            class_weights=domain['class_weights'],learning_rate=domain['learning_rate'])
+        cfg['loss']['enabled'].append('domain');cfg['loss']['weights']['domain']=domain['weight']
     cfg['training']['epochs']=plan['pretrain_epochs'] if pretrain else plan['finetune_epochs']
     cfg['training']['warmup_epochs']=1
     cfg['training']['optimizer']['base_lr']=plan['learning_rate']
@@ -65,7 +71,7 @@ def main():
     p.add_argument('--until-epoch',type=int,required=True);p.add_argument('--smoke',action='store_true')
     a=p.parse_args();plan=yaml.safe_load(a.config.read_text())
     if a.smoke:
-        plan['plant_root']=str(Path(plan['output_root'])/'plants-smoke')
+        plan['plant_root']=str(Path(plan['plant_root']).parent/'plants-smoke')
     cfg=configuration(plan,a.arm)
     pretrain=a.arm.startswith('pretrain_');weighted=cfg['loss']['weights']['spline']>0
     if not (Path(plan['plant_root'])/'READY').exists():raise ValueError('Plant preparation not complete')
@@ -75,16 +81,18 @@ def main():
     seed(plan['seed']);train,_=build_data_loaders(cfg)
     mri_cfg=copy.deepcopy(cfg);mri_cfg['data']['datasets'].pop('plants',None)
     mri_cfg['data']['train_augmentation']=False
+    mri_cfg['domain_adaptation']['enabled']=False
+    mri_cfg['loss']['enabled']=[x for x in mri_cfg['loss']['enabled'] if x!='domain']
     mri_train,_=build_data_loaders(mri_cfg)
     manifest=json.loads(Path(plan['population_manifest']).read_text())
     assert [r.sample_id for r in mri_train.dataset.datasets[0].records]==manifest['train_ids']
     if a.arm=='pretrain_vessels':
         generator=torch.Generator().manual_seed(plan['seed'])
-        sampler=RandomSampler(train.dataset,replacement=True,num_samples=12 if a.smoke else plan['pretrain_draws_per_epoch'],generator=generator)
+        sampler=RandomSampler(train.dataset,replacement=True,num_samples=3*plan['batch_size'] if a.smoke else plan['pretrain_draws_per_epoch'],generator=generator)
         train=DataLoader(train.dataset,batch_size=plan['batch_size'],sampler=sampler,num_workers=plan['workers'],
             collate_fn=image_graph_collate,worker_init_fn=seed_data_worker,generator=generator,pin_memory=True)
-    if a.smoke and a.arm=='pretrain_mixed':train.sampler.num_samples=12
-    if pretrain and not a.smoke:assert len(train)*plan['batch_size']==plan['pretrain_draws_per_epoch']
+    if a.smoke and a.arm=='pretrain_mixed':train.sampler.num_samples=3*plan['batch_size']
+    if pretrain and not a.smoke:assert train.sampler.num_samples==plan['pretrain_draws_per_epoch']
     ids=json.loads((Path(plan['evaluation_membership_run'])/'evaluation-sample-ids.json').read_text())
     val=build_evaluation_loader(mri_cfg,dataset_name='synthetic_mri',sample_ids=ids['val'][:4] if a.smoke else ids['val'])
     train_eval=training_evaluation_loader(mri_train,mri_cfg,ids['train'][:4] if a.smoke else ids['train'])
@@ -106,11 +114,11 @@ def main():
         initial_weights=Path(plan['output_root'])/'runs'/(('smoke-' if a.smoke else '')+'pretrain_'+a.arm.split('_')[0])/'best.pt'
         checkpoint=load_checkpoint_file(initial_weights)
         # Transfer detector only; initialize both geometry heads from the same fresh seed.
-        state={k:v for k,v in checkpoint['net'].items() if not k.startswith('spline_head.')}
+        state={k:v for k,v in checkpoint['net'].items() if not k.startswith('spline_head.') and 'domain_discriminator' not in k}
         report=model.load_state_dict(state,strict=False)
         assert not report.unexpected_keys and all(k.startswith('spline_head.') for k in report.missing_keys)
     write_json(out/'provenance.json',dict(arm=a.arm,pretrain=pretrain,initial_weights=str(initial_weights),
-        seed=plan['seed'],draws_per_epoch=len(train)*plan['batch_size'],source=plan,
+        seed=plan['seed'],draws_per_epoch=train.sampler.num_samples if pretrain else len(train.dataset),source=plan,
         gradient_route='graph_only',plant_geometry_supervised=False,
         best_selection='validation common_branch_f1 then native_edge_f1, unchanged from previous paired study',
         bn='training statistics during updates; saved running statistics during evaluation'))
@@ -139,13 +147,22 @@ def main():
         with (out/'history.jsonl').open('a') as f:f.write(json.dumps(row)+'\n')
         print(json.dumps(row),flush=True)
     try:
-        if start==0:monitor()
+        if start==0 and a.smoke:monitor()
         limit=min(a.until_epoch,cfg['training']['epochs'])
         stop=False
         for epoch in range(start+1,limit+1):
             for batch_index,batch in enumerate(train):
                 step+=1
+                if a.smoke:torch.cuda.reset_peak_memory_stats();torch.cuda.synchronize();batch_started=time.monotonic()
                 loss=train_step(model,criterion,optimizer,scheduler,batch,cfg,'cuda',epoch=epoch,iteration=step,total_iterations=len(train)*cfg['training']['epochs'])
+                if a.smoke:
+                    torch.cuda.synchronize()
+                    diagnostic=dict(step=step,batch_size=len(batch[2]),seconds=time.monotonic()-batch_started,peak_memory_gib=torch.cuda.max_memory_allocated()/2**30,domain_loss=float(loss['domain'].detach()) if 'domain' in loss else None,domain_labels=batch[-1].tolist())
+                    if cfg['domain_adaptation']['enabled']:
+                        assert set(batch[-1].tolist())=={0,1}
+                        for module in [model.backbone_domain_discriminator,model.instance_domain_discriminator]:
+                            assert any(x.grad is not None and x.grad.abs().sum()>0 for x in module.parameters())
+                    with (out/'smoke-batches.jsonl').open('a') as f:f.write(json.dumps(diagnostic)+'\n')
                 if batch_index==0:
                     assert all(torch.isfinite(x.grad).all() for x in model.parameters() if x.grad is not None)
                     assert any(x.grad is not None and x.grad.abs().sum()>0 for x in model.encoder.parameters())

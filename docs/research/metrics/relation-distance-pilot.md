@@ -131,7 +131,7 @@ smokes passed. Initial weights, initial decoded metrics and training batch order
 were identical across arms. Frozen state and transformer tokens stayed identical;
 relation-only node outputs stayed identical, while node-head coordinates updated.
 Compact hashes and per-arm verification timings are recorded with the submission.
-The four full pilot results remain **pending**. Compact submission provenance is in
+The four full pilots subsequently **completed successfully**; see the completed results below. Compact submission provenance is in
 `experiments/spline_learning/metadata/metrics/relation-distance-pilot/submission.json`.
 
 Outputs:
@@ -149,3 +149,41 @@ sbatch --array=0-3%4 --dependency=afterok:VERIFY_JOB --kill-on-invalid-dep=yes \
 
 Output directories reject reuse. A rerun requires a separately recorded fresh
 output root; completed or failed artifacts should remain available.
+
+## Completed results — 2026-10-14
+
+All four 1,000-update jobs completed with exit 0 in **17 min 33 s to 18 min 37 s**, including full validation. All 1,952 patches were scored in every arm. Paired initial weights, batch order and evaluation membership agree; frozen-state and transformer-token checks passed. No further model testing was needed.
+
+Compare final full-validation scores with the saved full starting checkpoint, rather than the initial 128-case monitor.
+
+| Model | Curve F1, 1 mm | TOPO-3D F1 | APLS-3D | Betti-0 error | Betti-1 error |
+|---|---:|---:|---:|---:|---:|
+| starting_checkpoint | 0.3426 | 0.1860 | 0.1042 | 2.7018 | 2.1332 |
+| relation_control | 0.3336 | 0.1806 | 0.0990 | 3.0236 | 1.9759 |
+| relation_near | 0.3351 | 0.1826 | 0.1007 | 3.3207 | 1.7208 |
+| node_control | 0.3367 | 0.1834 | 0.1018 | 2.9180 | 2.0353 |
+| node_near | 0.3342 | 0.1820 | 0.1009 | 3.3397 | 1.7382 |
+
+At **2 mm**, conditional relation scores use only branches whose endpoints are both recovered:
+
+| Model | Node recall | Both endpoints found | Long-branch recall (≥17.71 mm) | Near nonedge false-positive rate (<4.90 mm) |
+|---|---:|---:|---:|---:|
+| starting_checkpoint | 45.3% | 16.9% | 42.8% | 71.9% |
+| relation_control | 45.3% | 16.9% | 39.3% | 73.7% |
+| relation_near | 45.3% | 16.9% | 41.1% | 66.1% |
+| node_control | 45.4% | 17.0% | 40.4% | 71.3% |
+| node_near | 45.4% | 17.0% | 40.4% | 67.1% |
+
+### Interpretation
+
+- **Weighting has a modest specific effect:** with fixed nodes, near false-positive rate falls from **73.7% to 66.1%**, while long-branch recall moves from **39.3% to 41.1%**. Overall conditional relation recall remains about 66%. These comparisons use identical eligible nodes/pairs; they establish an effect of this weighting at the saved operating point, not a solved connectivity problem.
+- **Node-head adaptation is small:** 2 mm node recall rises from **45.27% to 45.37%**, and endpoint-pair recovery from **16.88% to 16.95%**. Because relation features contain fixed tokens, not node-head outputs, both node arms produce the same node updates; relation weighting chiefly changes edge selection. This does not establish what would happen when shared image/token features are trainable.
+- **Decoded graph quality does not improve over the starting checkpoint:** all four have lower Curve F1, TOPO and APLS. Weighting reduces cycles but increases disconnected-component error, consistent with removing links while leaving fragmentation. It should not be selected as an overall improvement based only on fewer near false links.
+- **A large generalization gap is already present before these updates:** on the fixed 512 training patches, raw node recall is **97.81% at 1 mm / 98.77% at 2 mm**, versus **18.75% / 45.27%** on full validation. Training conditional long-branch recall is **99.70% / 99.66%**, versus validation **50.0% / 42.8%**. The train and validation populations are disjoint; both use the same physical diagnostic. Continued head learning barely changes localization and does not close this gap.
+- The weighted relation-only arm reduces 2 mm training near-nonedge FPR from **0.66% to 0.22%**, while validation remains **66.1%**. Thus the current detector/scorer can distinguish connections on its training population but transfers poorly. This supports investigating overfitting or train/validation distribution differences; it does **not** prove which one is responsible or that token capacity alone is insufficient.
+
+### Research decision
+
+Do not extend these exact pilots merely because they completed successfully. The next useful question is why node/connection learning transfers poorly. A cheap candidate is to audit already saved earlier/best-checkpoint predictions with the same decomposition, then inspect sampling/augmentation and train/validation differences if the gap persists. Existing curve-image-evidence experiments remain relevant, but these results alone do not justify immediately adding more architecture. Further learning experiments require a new decision.
+
+Compact full initial/final aggregates and provenance: `experiments/spline_learning/metadata/metrics/relation-distance-pilot/results.json`. Paired headline CSV: `experiments/spline_learning/metadata/metrics/relation-distance-pilot/comparison.csv`. Full per-patch predictions, diagnostics and offline W&B runs stay in the scratch arm folders above.

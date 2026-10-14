@@ -10,7 +10,7 @@
     "node_near"
   ],
   "updates": 1000,
-  "status": "GPU verification passed; full pilot results pending",
+  "status": "all four pilots completed; full validation evaluated",
   "local_checks": {
     "syntax": "passed",
     "targeted_tests_passed": 2,
@@ -84,5 +84,29 @@
     "paired_initial_predictions_equal": true,
     "paired_initial_weights_equal": true,
     "paired_training_order_equal": true
-  }
+  },
+  "completed_jobs": {
+    "relation_control": {
+      "state": "COMPLETED",
+      "exit_code": "0:0",
+      "wall_time": "00:17:49"
+    },
+    "relation_near": {
+      "state": "COMPLETED",
+      "exit_code": "0:0",
+      "wall_time": "00:17:33"
+    },
+    "node_control": {
+      "state": "COMPLETED",
+      "exit_code": "0:0",
+      "wall_time": "00:18:10"
+    },
+    "node_near": {
+      "state": "COMPLETED",
+      "exit_code": "0:0",
+      "wall_time": "00:18:37"
+    }
+  },
+  "results": "results.json",
+  "comparison": "comparison.csv"
 }

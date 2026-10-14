@@ -38,3 +38,5 @@ Expected benefit: diverse branching patterns and orientation exposure may improv
 No plant pretraining or regeneration was launched in this task. Remaining gates: upload completion, topology/provenance harmonization, spline augmentation implementation, and a short mixed-batch forward/loss smoke before training.
 
 Loader check limitation: direct mutable-environment item loading failed because `SimpleITK._version` is missing. VTP reads and all-file triplet inventory passed (no missing or zero-byte counterparts). Use the established fixed runtime archive for the next mixed-batch smoke; do not infer a dataset defect from this environment failure or silently substitute another image reader.
+
+Update: the authorized preparation, augmentation implementation and training submission are recorded in [generalization-training.md](generalization-training.md). Fixed-runtime GPU smoke tests passed; the mutable-environment limitation above no longer blocks these runs.

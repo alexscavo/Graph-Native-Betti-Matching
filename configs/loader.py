@@ -123,8 +123,8 @@ def validate_config(config: Mapping[str, Any]) -> None:
         _positive_int(spline.get('samples',64),'model.spline.samples')
         if spline.get('residual_scale','mm') not in {'mm','relative'}:
             raise ConfigError('model.spline.residual_scale must be mm or relative')
-        if config.get('data',{}).get('train_augmentation',False):
-            raise ConfigError('Spline augmentation is not implemented; disable train_augmentation')
+        if config.get('data',{}).get('train_augmentation',False) and config.get('augmentation',{}).get('synthetic_mri',{}).get('zoom',{}).get('enabled',True):
+            raise ConfigError('Spline augmentation supports rotations/noise; disable zoom')
         if config.get('loss',{}).get('spline',{}).get('mode') not in {'controls','curve'}:
             raise ConfigError('loss.spline.mode must be controls or curve')
         if 'spline' not in config.get('loss',{}).get('enabled',[]):

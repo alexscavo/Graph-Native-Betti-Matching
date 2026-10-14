@@ -30,7 +30,7 @@ class ContractedGraph:
     betti_1: int
 
 
-def contract_degree_two(nodes: np.ndarray, edges: np.ndarray, *, edge_polylines=None) -> ContractedGraph:
+def contract_degree_two(nodes: np.ndarray, edges: np.ndarray, *, edge_polylines=None, preserve_nodes=()) -> ContractedGraph:
     positions = np.asarray(nodes, dtype=np.float64)
     if positions.ndim != 2 or positions.shape[1] not in (2, 3) or not np.isfinite(positions).all():
         raise ValueError("nodes must have finite shape (N,2) or (N,3)")
@@ -80,7 +80,10 @@ def contract_degree_two(nodes: np.ndarray, edges: np.ndarray, *, edge_polylines=
         parent[root(a)] = root(b)
     beta_0 = len({root(node) for node in range(len(positions))})
     beta_1 = len(links) - len(positions) + beta_0
-    anchors = {i: positions[i].copy() for i, neighbors in enumerate(adjacency) if len(neighbors) != 2}
+    protected = set(map(int, preserve_nodes))
+    if any(i < 0 or i >= len(positions) for i in protected):
+        raise ValueError('preserved node outside node array')
+    anchors = {i: positions[i].copy() for i, neighbors in enumerate(adjacency) if len(neighbors) != 2 or i in protected}
     roles = {i: ("isolated" if not adjacency[i] else "endpoint" if len(adjacency[i]) == 1 else "junction")
              for i in anchors}
     visited: set[int] = set()

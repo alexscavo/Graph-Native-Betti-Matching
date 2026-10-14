@@ -108,8 +108,8 @@ class SyntheticMRIDataset(Dataset):
         self.augment = bool(augment)
         self.spline_controls = spline_controls
         self.spline_family = spline_family
-        if spline_controls is not None and self.augment:
-            raise ValueError('Spline baseline requires augmentation off until all geometry transforms are implemented')
+        if spline_controls is not None and self.augment and zoom_range is not None:
+            raise ValueError('Spline augmentation currently supports quarter-turn rotations and image noise; disable zoom')
         self.rotate_90 = bool(rotate_90)
         self.zoom_range = (
             None
@@ -193,6 +193,10 @@ class SyntheticMRIDataset(Dataset):
             nodes = rotate_coordinates(
                 nodes, turns, shape_before_rotation, allow_patch_faces=True
             )
+
+            if geometry is not None:
+                from data.spline_augmentation import rotate_spline_geometry
+                geometry = rotate_spline_geometry(geometry, turns, shape_before_rotation)
 
             if self.zoom_range is not None:
                 zoom_factor = self.rng.uniform(*self.zoom_range)

@@ -4,7 +4,7 @@ import numpy as np
 from scipy.interpolate import BSpline
 
 
-def contract_spline_graph(nodes, edges, max_anchors=120, *, closed_components=0):
+def contract_spline_graph(nodes, edges, max_anchors=120, *, closed_components=0, preserve_nodes=()):
     """Return the contracted target and its whole-patch exclusion reason."""
     from metrics.branch_connectivity import contract_degree_two
     links = np.asarray(edges, dtype=np.int64).reshape(-1, 2)
@@ -16,7 +16,7 @@ def contract_spline_graph(nodes, edges, max_anchors=120, *, closed_components=0)
     source_pairs = {tuple(sorted(pair)) for pair in links.tolist()}
     if len(source_pairs) != len(links):
         return None, 'parallel_branches'
-    graph = contract_degree_two(nodes, edges)
+    graph = contract_degree_two(nodes, edges, preserve_nodes=preserve_nodes)
     pairs = [tuple(sorted((b.start, b.end))) for b in graph.branches]
     reason = ('closed_branch' if any(a == b or a < 0 for a, b in pairs) else
               'parallel_branches' if len(set(pairs)) != len(pairs) else

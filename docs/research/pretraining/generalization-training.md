@@ -70,3 +70,12 @@ Replacement chain:
 -1069045_0..3 fine-tuning to100epochs, aftercorr1069044.
 
 The original completed preparation job aged out of the scheduler dependency window, so submission uses the existing target READY guard rather than a dependency on that historical job. All training still waits for the new GPU check. Machine-readable replacement IDs: `experiments/plant_pretraining/submissions/20261014-da-b32-w1-restart.json`.
+
+
+## Restart chain status (2026-10-14)
+
+Verification1069024 completed successfully,14m47s. Batch32 mixed 3-step GPU smoke used peak9.19GiB; domain losses3.487,3.243,3.205 were finite, both domain labels were present, and gradients reached image and instance discriminators. MRI-only and both straight/spline fine-tuning smokes also passed at batch32. Two targeted local domain tests passed.
+
+Fresh chain1069042_0/1 completed its25epoch stage from random initialization, batch32, domain weight1.0 in mixed arm. Continuation1069043_0/1 is running to epoch50. Fine-tuning arrays1069044 and1069045 are submitted with verified dependencies on those stages; scheduler inspection confirms they wait on1069043, then1069044. They will initialize only from the new pretraining checkpoints. Superseded0.1/batch4 jobs were cancelled and are not dependencies.
+
+Job records and verified configuration: `experiments/plant_pretraining/submissions/20261014-da-b32-w1-restart.json`, `configs/plant_generalization_da_b32.yaml`.

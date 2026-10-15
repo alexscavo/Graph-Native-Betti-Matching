@@ -64,7 +64,7 @@ def sensitivity(model, batch, config):
 
 
 def geometry(model, loader, config, output, step, tracker, subset_epoch, score_chords=False, split='val'):
-    destination = output / (f'validation-{step:06d}' if split == 'val' else f'train-evaluation-{step:06d}')
+    destination = output / (f'validation-{step:06d}' if split == 'val' else f'test-{step:06d}' if split == 'test' else f'train-evaluation-{step:06d}')
     native, _ = evaluate_model(model, loader, config, 'cuda', output_dir=destination)
     records = json.loads((destination / 'predictions.json').read_text())
     assert [r['source_sample_id'] for r in records] == [r.sample_id for r in loader.dataset.records]

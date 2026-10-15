@@ -328,7 +328,7 @@ def validate_config(config: Mapping[str, Any]) -> None:
     datasets = data.get("datasets")
     if not isinstance(datasets, Mapping) or not datasets:
         raise ConfigError("data.datasets must contain at least one dataset")
-    valid_names = {"plants", "synthetic_mri"}
+    valid_names = {"plants", "synthetic_mri", "source_mri"}
     valid_roles = {"source", "target"}
     target_count = 0
     for name, dataset in datasets.items():
@@ -362,7 +362,7 @@ def validate_config(config: Mapping[str, Any]) -> None:
                 raise ConfigError(
                     f"{location}.coordinate_order_on_disk must be [y, x]"
                 )
-        elif name == "synthetic_mri":
+        elif name in {"synthetic_mri", "source_mri"}:
             if dataset.get("patch_selection", "all") not in {"all", "foreground", "graph_positive"}:
                 raise ConfigError(
                     f"{location}.patch_selection must be all, foreground or graph_positive"

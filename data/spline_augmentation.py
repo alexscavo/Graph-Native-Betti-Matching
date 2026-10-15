@@ -31,3 +31,30 @@ def rotate_spline_geometry(geometry, turns, shape):
     metric = geometry['metric']
     result['metric'] = metric @ torch.linalg.inv(matrix.to(metric))
     return result
+
+
+def project_plant_geometry(geometry, parameters, inner_size, size, padding, voxel_mm):
+    """PNG(y,x,0) -> projected/augmented/padded volume; virtual units, not plant mm.
+
+    Keep the physical basis in original PNG axis order to preserve cached edge
+    orientation. Controls may legitimately lie outside the volume: never clamp.
+    """
+    if parameters.zoom_factor != 1.0:
+        raise ValueError('Plant spline supervision does not support zoom')
+    controls = geometry['controls']
+    swap = controls.new_tensor([[0.,1.,0.],[1.,0.,0.],[0.,0.,1.]])
+    matrix, offset = rotation_affine(parameters.quarter_turns, (inner_size,)*3,
+                                    dtype=controls.dtype, device=controls.device)
+    for axis, flip in enumerate(parameters.flip_axes):
+        if flip:
+            matrix[axis] *= -1
+            offset[axis] = (inner_size-1)/inner_size - offset[axis]
+    scale = inner_size / size
+    result = {}
+    for key, value in geometry.items():
+        if key in ('controls', 'curves', 'guides', 'full_paths'):
+            projected = value @ swap.T + controls.new_tensor([0.,0.,.5])
+            result[key] = (projected @ matrix.T + offset)*scale + padding/size
+    # Before augmentation: inner_size*voxel_mm in original y,x,z basis.
+    result['metric'] = (inner_size*voxel_mm*swap) @ torch.linalg.inv(matrix*scale)
+    return result

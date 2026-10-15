@@ -41,6 +41,8 @@ class PlantsDataset(Dataset):
         size: int = 64,
         padding: int = 5,
         projection_depth: int = 5,
+        spline_controls=None,
+        virtual_voxel_mm: float = 1.0,
         augment: bool = False,
         rotate_90: bool = True,
         flip_probability=(0.5, 0.5, 0.5),
@@ -60,6 +62,10 @@ class PlantsDataset(Dataset):
             not 0.0 <= float(value) <= 1.0 for value in flip_probability
         ):
             raise ValueError("flip_probability must contain three values in [0,1]")
+        self.spline_controls = spline_controls
+        self.virtual_voxel_mm = float(virtual_voxel_mm)
+        if self.virtual_voxel_mm <= 0:
+            raise ValueError("virtual_voxel_mm must be positive")
         self.records = list(records)
         self.size = int(size)
         self.padding = int(padding)
@@ -162,6 +168,17 @@ class PlantsDataset(Dataset):
         segmentation = self._project_image_3d(segmentation, z_position)
         image = self._project_image_3d(image, z_position)
 
+        geometry = None
+        if self.spline_controls is not None:
+            import numpy as np
+            path = record.graph.parent.parent/'spline'/f'{record.sample_id}.npz'
+            with np.load(path, allow_pickle=False) as cache:
+                if not np.allclose(cache['nodes'], nodes.numpy(), atol=1e-6) or not np.array_equal(cache['edges'], edges.numpy()):
+                    raise ValueError(f'Plant spline cache / graph mismatch: {record.sample_id}')
+                geometry = {k: torch.from_numpy(cache[k].copy()) for k in ('controls','curves','guides')}
+            if geometry['controls'].shape != (len(edges), int(self.spline_controls), 3):
+                raise ValueError('Plant spline control count mismatch')
+
         # The generator stores normalized (y,x); MedPy exposes the image axes
         # in (x,y), so swap once before appending the projected z coordinate.
         nodes = nodes.float()[:, :2]
@@ -173,9 +190,12 @@ class PlantsDataset(Dataset):
             segmentation.new_tensor(0.5),
             segmentation.new_tensor(-0.5),
         )
-        transformed = apply_augmentation(
-            image, segmentation, nodes, self._augmentation_parameters()
-        )
+        parameters = self._augmentation_parameters()
+        transformed = apply_augmentation(image, segmentation, nodes, parameters)
+        if geometry is not None:
+            from data.spline_augmentation import project_plant_geometry
+            geometry = project_plant_geometry(geometry, parameters, self.inner_size,
+                self.size, self.padding, self.virtual_voxel_mm)
         image = self.pad(self.scale(transformed.image))
         segmentation = self.pad(transformed.segmentation)
         nodes = (
@@ -187,7 +207,7 @@ class PlantsDataset(Dataset):
             [segmentation],
             [nodes],
             [edges],
-            [z_position],
+            [geometry if geometry is not None else z_position],
             [self.domain_label],
         )
 

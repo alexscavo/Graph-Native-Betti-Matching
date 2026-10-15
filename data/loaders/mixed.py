@@ -146,13 +146,15 @@ def _dataset_for_split(
             size=int(image_size[0]),
             padding=padding,
             projection_depth=int(plants_augmentation["projection_depth"]),
+            spline_controls=settings.get("spline_controls"),
+            virtual_voxel_mm=float(settings.get("virtual_voxel_mm", 1.0)),
             rotate_90=bool(plants_augmentation["rotate_90"]["enabled"]),
             flip_probability=(probability, probability, probability)
             if bool(flip["enabled"])
             else (0.0, 0.0, 0.0),
             **common,
         )
-    if name == "synthetic_mri":
+    if name in {"synthetic_mri", "source_mri"}:
         mri_augmentation = augmentation["synthetic_mri"]
         zoom = mri_augmentation["zoom"]
         noise = mri_augmentation["gaussian_noise"]

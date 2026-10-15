@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""IXI-only, plants/IXI, SyntheticMRI/IXI; representation trained in both stages."""
+"""IXI-only, plants/IXI, SyntheticMRI/IXI; both-stage and delayed spline supervision."""
 import argparse
 import copy
 import hashlib
@@ -38,7 +38,7 @@ class TransferCriterion(RoutedCriterion):
 def configuration(plan, arm):
     from scripts.train_plant_generalization import configuration as original_configuration
     pretrain=arm.startswith('pretrain_')
-    strategy,representation=arm.removeprefix('pretrain_').rsplit('_',1)
+    strategy,representation=arm.removeprefix('pretrain_').replace('_delayed_spline','_spline').rsplit('_',1)
     assert strategy in ('ixi','plants','synthetic')
     assert representation in ('straight','spline')
     cfg=original_configuration(plan,'pretrain_vessels' if pretrain else 'vessels_'+representation)
@@ -66,6 +66,20 @@ def configuration(plan, arm):
     return cfg
 
 
+def finetuning_initialization(arm):
+    """Delayed geometry reproduces graph-only pretraining -> fresh spline head."""
+    return arm.replace('_delayed_spline','_straight'), '_delayed_spline' in arm
+
+
+def transfer_checkpoint(model, checkpoint, arm):
+    _, fresh_geometry = finetuning_initialization(arm)
+    state={k:v for k,v in checkpoint['net'].items()
+           if 'domain_discriminator' not in k and not (fresh_geometry and k.startswith('spline_head.'))}
+    report=model.load_state_dict(state,strict=False)
+    assert not report.unexpected_keys
+    assert all(fresh_geometry and k.startswith('spline_head.') for k in report.missing_keys)
+
+
 def check_domain_geometry(model, criterion, batch, config):
     """One positive graph per domain proves geometry gradients reach the head."""
     result={}
@@ -85,7 +99,7 @@ def check_domain_geometry(model, criterion, batch, config):
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--config',type=Path,default=Path('configs/ixi_transfer.yaml'))
-    p.add_argument('--arm',required=True,choices=[prefix+strategy+'_'+rep for prefix in ('pretrain_','') for strategy in ('ixi','plants','synthetic') for rep in ('straight','spline')])
+    p.add_argument('--arm',required=True,choices=[prefix+strategy+'_'+rep for prefix in ('pretrain_','') for strategy in ('ixi','plants','synthetic') for rep in ('straight','spline')]+[s+'_delayed_spline' for s in ('ixi','plants','synthetic')])
     p.add_argument('--until-epoch',type=int,required=True);p.add_argument('--smoke',action='store_true')
     a=p.parse_args();plan=yaml.safe_load(a.config.read_text())
     population=json.loads((Path(plan['ixi_root'])/'manifest.json').read_text())
@@ -131,12 +145,10 @@ def main():
         start=checkpoint['epoch'];step=checkpoint['steps'];best=tuple(checkpoint['best_score']);best_epoch=checkpoint['best_epoch']
         restore_rng(checkpoint['rng'],train)
     elif not pretrain:
-        initial_weights=Path(plan['output_root'])/'runs'/(('smoke-' if a.smoke else '')+'pretrain_'+a.arm)/'best.pt'
+        source_arm,_=finetuning_initialization(a.arm)
+        initial_weights=Path(plan['output_root'])/'runs'/(('smoke-' if a.smoke else '')+'pretrain_'+source_arm)/'best.pt'
         checkpoint=load_checkpoint_file(initial_weights)
-        # Continue the same learned representation, including spline geometry, into IXI-only training.
-        state={k:v for k,v in checkpoint['net'].items() if 'domain_discriminator' not in k}
-        report=model.load_state_dict(state,strict=False)
-        assert not report.unexpected_keys and not report.missing_keys
+        transfer_checkpoint(model,checkpoint,a.arm)
     digest=hashlib.sha256()
     if pretrain and start==0:
         for name,value in sorted(model.state_dict().items()):
@@ -147,7 +159,7 @@ def main():
         assert len(set(references+[digest.hexdigest()]))==1,'Shared initialization mismatch'
     write_json(out/'provenance.json',dict(initial_shared_state_sha256=digest.hexdigest() if pretrain and start==0 else None,arm=a.arm,pretrain=pretrain,initial_weights=str(initial_weights),
         seed=plan['seed'],draws_per_epoch=train.sampler.num_samples if pretrain else len(train.dataset),source=plan,
-        gradient_route='graph_only',geometry_supervised_in_both_stages=weighted,plant_geometry_supervised=weighted and a.arm=='pretrain_plants_spline',
+        gradient_route='graph_only',geometry_supervised_in_both_stages=weighted and '_delayed_spline' not in a.arm,geometry_initialized_fresh_at_finetuning='_delayed_spline' in a.arm,plant_geometry_supervised=weighted and a.arm=='pretrain_plants_spline',
         best_selection='validation common_branch_f1 then native_edge_f1, unchanged from previous paired study',
         bn='training statistics during updates; saved running statistics during evaluation'))
     cfg['tracking']['enabled']=not a.smoke

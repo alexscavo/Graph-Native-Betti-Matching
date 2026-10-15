@@ -83,3 +83,30 @@ Config: `configs/ixi_transfer.yaml`. Runner: `scripts/train_ixi_transfer.py`; it
 First inspect full-population exclusions and GPU checks; then compare learning curves and final held-out metrics. This experiment tests auxiliary biological versus synthetic vascular sources under a fixed update budget. It does not isolate a single causal “biological alignment” mechanism or establish source-independent superiority. No new sweep or loss terms are authorized by this setup.
 
 Submission check: both full preparation jobs are running; all GPU stages and tests are registered with the intended dependencies. The two training smoke targets were visually inspected in `previews/ixi-target-smoke.png`: retained paths align with the masks, but source-derived graphs do not explain every foreground fragment. This is a limitation of the existing extracted references, not evidence of anatomical completeness.
+
+## Added matched protocol: graph-only pretraining → spline fine-tuning (2026-10-15)
+
+All original jobs above are preserved. The original six-arm study includes spline supervision in both stages; earlier SyntheticMRI experiments introduced spline supervision only during fine-tuning. To distinguish these protocols, three additional fine-tunings reuse the existing graph-only pretraining checkpoints:
+
+| Source strategy | Existing straight control | Added delayed spline | Existing both-stage spline ablation |
+|---|---|---|---|
+|IXI only|`ixi_straight`|`ixi_delayed_spline`|`ixi_spline`|
+|Plants + IXI|`plants_straight`|`plants_delayed_spline`|`plants_spline`|
+|SyntheticMRI + IXI|`synthetic_straight`|`synthetic_delayed_spline`|`synthetic_spline`|
+
+Each delayed arm loads `pretrain_<strategy>_straight/best.pt`, excludes `spline_head.*` and domain-classifier weights, and initializes fresh spline geometry with the fixed seed. It uses the same detached residual geometry objective, fine-tuning budget, augmentation, batch size, IXI membership, validation selection and held-out evaluation as the existing arms. No new pretraining is needed. Existing straight controls are shared, yielding nine final models. This matches the earlier SyntheticMRI *stage protocol*; IXI still uses its own dataset and 256 queries, versus 120 in that earlier study.
+
+Lightweight verification passed for all three configurations (target-only, domain adaptation disabled, spline weight unchanged) and checkpoint transfer (detector restored, delayed geometry left fresh; existing both-stage geometry restored). Syntax checks passed. GPU verification is queued and gates each corresponding training; training results are not yet available.
+
+| Added stage | Job array |
+|---|---|
+|Delayed-head GPU smoke|1128482|
+|Fine-tuning through epoch 50|1128483|
+|Continuation through epoch 100|1128484|
+|Validation-selected held-out test|1128485|
+
+Arrays use indices 0,2,4, preserving correspondence with original straight-pretraining tasks. Smoke depends on corresponding original smoke 1126576; fine-tuning depends on both its smoke and original pretraining 1126578. Subsequent stages use corresponding-task success dependencies. The existing early-stopping rule remains active; 100 epochs is the maximum.
+
+Submission record: `experiments/ixi_transfer/delayed-submission-20261015.json`.
+Reproduction: `python3 cluster/jean_zay/submit_ixi_delayed_spline.py` (refuses an existing submission record to prevent duplicates).
+Output uses the existing runs root with separate `<strategy>_delayed_spline` directories. Compare delayed splines against the shared straight controls first, then against both-stage splines to assess whether geometry pretraining helps. Do not pool these two spline protocols under a single label.

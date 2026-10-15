@@ -110,3 +110,25 @@ Arrays use indices 0,2,4, preserving correspondence with original straight-pretr
 Submission record: `experiments/ixi_transfer/delayed-submission-20261015.json`.
 Reproduction: `python3 cluster/jean_zay/submit_ixi_delayed_spline.py` (refuses an existing submission record to prevent duplicates).
 Output uses the existing runs root with separate `<strategy>_delayed_spline` directories. Compare delayed splines against the shared straight controls first, then against both-stage splines to assess whether geometry pretraining helps. Do not pool these two spline protocols under a single label.
+
+### Recovery after GPU diagnostic failure
+
+Both dataset preparations completed. Original GPU checks 1126576 tasks 0,1,2,4 and all delayed checks 1128482 passed. Tasks 3 and 5 failed inside `check_domain_geometry`: its one-sample forward reached the domain discriminator's training-mode BatchNorm (`[1,2048]`). This was a diagnostic failure before production pretraining, not evidence that optimization failed. Slurm automatically cancelled all downstream production chains; no running training was manually cancelled.
+
+Minimal correction: run this standalone gradient probe in evaluation mode with autograd enabled, then restore each module's original mode in `finally`. BatchNorm running statistics are preserved. Actual training updates still use training mode, batch 32 and active domain adaptation. A CPU check reproduced the failure with the actual domain discriminator, then exercised the corrected probe for both domains: positive spline gradients, unchanged BN running means and restored training modes. The real GPU checks remain the production gate.
+
+Restored submissions (completed prerequisites verified through accounting; their old IDs had expired from Slurm's live dependency records):
+
+| Stage | Replacement job |
+|---|---|
+|Retry only failed GPU checks, indices 3,5|1145367|
+|Six pretrainings through epoch 25|1145368|
+|Six pretrainings through epoch 50|1145369|
+|Original six fine-tunings through epoch 50|1145370|
+|Original six fine-tunings through epoch 100|1145371|
+|Original six held-out tests|1145372|
+|Three delayed-spline fine-tunings through epoch 50|1145373|
+|Three delayed-spline fine-tunings through epoch 100|1145374|
+|Three delayed-spline held-out tests|1145375|
+
+All production chains wait on the corrected GPU checks. Original records/results remain intact; these replacements retain all nine comparison arms. Authoritative recovery record: `experiments/ixi_transfer/probe-recovery-20261015.json`; reproducible submission script: `cluster/jean_zay/resubmit_ixi_after_probe_fix.py`.

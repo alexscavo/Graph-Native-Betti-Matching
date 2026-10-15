@@ -82,18 +82,27 @@ def transfer_checkpoint(model, checkpoint, arm):
 
 def check_domain_geometry(model, criterion, batch, config):
     """One positive graph per domain proves geometry gradients reach the head."""
-    result={}
-    for domain in sorted(set(batch[-1].tolist())):
-        i=next(i for i,d in enumerate(batch[-1].tolist()) if d==domain and len(batch[3][i])>0)
-        probe=(batch[0][i:i+1],batch[1][i:i+1],[batch[2][i]],[batch[3][i]],[batch[4][i]],batch[5][i:i+1])
-        volumes,targets=_move_graph_batch(probe,'cuda',config['training']['input'],True)
-        tokens,predictions,_=model(volumes)
-        losses=criterion(tokens,predictions,targets)
-        gradients=torch.autograd.grad(losses['spline'],[p for p in model.spline_head.parameters() if p.requires_grad],allow_unused=True)
-        norm=sum(float(g.detach().abs().sum()) for g in gradients if g is not None)
-        assert torch.isfinite(losses['spline']) and float(losses['spline_positive_edges'])>0 and norm>0
-        result[str(domain)]=dict(spline_loss=float(losses['spline'].detach()),positive_edges=float(losses['spline_positive_edges']),head_gradient_l1=norm)
-    return result
+    # This single-sample gradient probe is not an optimizer update. Freeze BN
+    # statistics (including the domain classifiers), while keeping autograd on.
+    modes={module:module.training for module in model.modules()}
+    model.eval()
+    try:
+        result={}
+        for domain in sorted(set(batch[-1].tolist())):
+            i=next(i for i,d in enumerate(batch[-1].tolist()) if d==domain and len(batch[3][i])>0)
+            probe=(batch[0][i:i+1],batch[1][i:i+1],[batch[2][i]],[batch[3][i]],[batch[4][i]],batch[5][i:i+1])
+            volumes,targets=_move_graph_batch(probe,'cuda',config['training']['input'],True)
+            tokens,predictions,_=model(volumes)
+            losses=criterion(tokens,predictions,targets)
+            gradients=torch.autograd.grad(losses['spline'],[p for p in model.spline_head.parameters() if p.requires_grad],allow_unused=True)
+            norm=sum(float(g.detach().abs().sum()) for g in gradients if g is not None)
+            assert torch.isfinite(losses['spline']) and float(losses['spline_positive_edges'])>0 and norm>0
+            result[str(domain)]=dict(spline_loss=float(losses['spline'].detach()),positive_edges=float(losses['spline_positive_edges']),head_gradient_l1=norm)
+        return result
+    finally:
+        for module,training in modes.items():
+            module.training=training
+
 
 
 def main():

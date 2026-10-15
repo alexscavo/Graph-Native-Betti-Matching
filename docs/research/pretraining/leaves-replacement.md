@@ -63,3 +63,9 @@ CPU smoke1093471 succeeded:2 train+2 val leaves,209/288 raw patches at80% overla
 - All dependencies confirmed in Slurm. No production training has started at this check. Failure of preparation or verification prevents dependent training; no automatic fallback to fewer samples.
 
 Static Python compilation and shell syntax checks passed. GPU correctness and full-population checks are queued, not yet claimed successful.
+
+### Dataset placement update
+
+Full extraction completed:80,079training and3,953validation candidates; selected25,000/480accepted patches,391compatibility exclusions encountered during selection. GPU verification also completed.
+
+Dataset entries are now available at `/lustre/fsn1/projects/rech/vnc/upz25mj/datasets/HALVS_DATASET/patches_3d_transfer_20261015/`. They currently link to the experiment storage to avoid interrupting active readers. The attempted atomic directory exchange was unsupported by Lustre and made no data changes. CPU job1127211 waits for leaf fine-tuning array1094739, then moves the actual directories into the dataset folder and leaves reverse aliases at the old experiment paths. Configuration now uses the dataset path; existing resolved configs remain valid through aliases. Check `relocation.json` for physical move completion.

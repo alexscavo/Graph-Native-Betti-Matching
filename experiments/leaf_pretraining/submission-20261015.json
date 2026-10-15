@@ -87,5 +87,11 @@
     }
   },
   "mri_control": "/lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/plant_generalization_20261014_da_b32_w1_restart/runs",
-  "status": "queued"
+  "status": "queued",
+  "relocation": {
+    "job_id": "1127211",
+    "dependency": "afterany:1094739",
+    "dataset_root": "/lustre/fsn1/projects/rech/vnc/upz25mj/datasets/HALVS_DATASET/patches_3d_transfer_20261015",
+    "status": "dataset links available now; physical move queued after training"
+  }
 }

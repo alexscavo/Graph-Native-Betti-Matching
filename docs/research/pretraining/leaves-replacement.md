@@ -69,3 +69,22 @@ Static Python compilation and shell syntax checks passed. GPU correctness and fu
 Full extraction completed:80,079training and3,953validation candidates; selected25,000/480accepted patches,391compatibility exclusions encountered during selection. GPU verification also completed.
 
 Dataset entries are now available at `/lustre/fsn1/projects/rech/vnc/upz25mj/datasets/HALVS_DATASET/patches_3d_transfer_20261015/`. They currently link to the experiment storage to avoid interrupting active readers. The attempted atomic directory exchange was unsupported by Lustre and made no data changes. CPU job1127211 waits for leaf fine-tuning array1094739, then moves the actual directories into the dataset folder and leaves reverse aliases at the old experiment paths. Configuration now uses the dataset path; existing resolved configs remain valid through aliases. Check `relocation.json` for physical move completion.
+
+## Completed training and held-out comparison submission
+
+Leaf pretraining 1094733 and both continuation stages 1094737/1094739 completed successfully. Existing full-validation results are collected in [source-transfer-results/validation-comparison.md](source-transfer-results/validation-comparison.md) and the adjacent CSV. These use `best.pt` selected by validation, not final checkpoints. This distinction can explain differences from previously reported final-checkpoint metrics.
+
+Matched comparison includes leaves+MRI, plants+MRI and the equal-update MRI-only control, each with straight edges and detached residual B-splines. All six used graph-only pretraining; geometry is introduced only in spline fine-tuning. The fine-tuning data, training settings, model architecture and evaluation configuration were checked for equality. The source-domain difference is intentional, including its rendering/extraction and graph distributions; it is not an isolated test of biological species. Single-seed results do not establish statistical significance.
+
+Validation on 1,952 patches: leaf spline edge F1 0.68793, plant spline 0.68524, MRI-only spline 0.72243; curve F1 0.45700, 0.45580 and 0.50357 respectively. Leaf spline node mAP 0.43951 versus plant 0.44261. Leaves currently look similar to plants and do not close the MRI-only gap. This is provisional validation evidence, not a held-out test conclusion.
+
+New held-out evaluation uses all 13,071 original test IDs, verified against the existing comparison manifest with a recorded ordered-ID hash. All six validation-selected checkpoints use identical native node/edge mAP/mAR/F1, common curve/branch metrics, same-endpoint chord comparison and the existing core geometry/topology/Betti/APLS/TOPO diagnostics. No augmentation, BatchNorm recalibration, checkpoint reselection, threshold tuning or retraining. Saved running statistics are used.
+
+- GPU smoke checks on two test patches for each leaf model: array **1145697**.
+- Six full test evaluations, gated by smoke success: array **1145698**, at most three concurrent GPUs.
+- Automatic report/CSV generation after all tests succeed: CPU job **1145699**.
+- Plan and submission records: `experiments/leaf_pretraining/evaluation/`.
+- Raw test output: `/lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/source_transfer_test_20261015/`.
+- Future final tables: `docs/research/pretraining/source-transfer-results/test-comparison.md` and `test-comparison.csv` (created only after all tests succeed).
+
+Static checks passed; all six configuration checks and full test membership checks passed. GPU evaluations were submitted and results are pending. Existing validation outputs were reused without repeated inference.

@@ -38,7 +38,14 @@ def collect(plan, split):
     text+='Single seed; no statistical superiority claim. Guides are uncertain extracted references.\n\n'
     if split=='validation':text+='These are validation results used for model selection, not held-out test results.\n\n'
     text+='| '+' | '.join(columns)+' |\n|'+'|'.join(['---']*len(columns))+'|\n'
-    for row in rows:text+='| '+' | '.join(row[k] if k=='model' else f'{row[k]:.4f}' for k in columns)+' |\n'
+    best={k:(min if k.endswith('_absolute_error') else max)(r[k] for r in rows) for k in columns if k!='model'}
+    for row in rows:
+        cells=[row['model']]
+        for k in columns[1:]:
+            value=f'{row[k]:.4f}'
+            cells.append('**'+value+'**' if row[k]==best[k] else value)
+        text+='| '+' | '.join(cells)+' |\n'
+    text+='\n**Bold** marks the best value per column (higher AP/AR/F1; lower Betti errors).\n'
     (dest/f'{split}-comparison.md').write_text(text)
     print(text)
 

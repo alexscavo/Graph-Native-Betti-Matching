@@ -137,5 +137,13 @@
       ]
     }
   },
-  "status": "queued"
+  "status": "queued",
+  "test_retries": [
+    {
+      "original": "1145372_0",
+      "replacement": "1160089_0",
+      "reason": "Node jzxh163 /tmp full while unpacking runtime; failed before inference",
+      "excluded_node": "jzxh163"
+    }
+  ]
 }

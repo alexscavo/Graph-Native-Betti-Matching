@@ -132,3 +132,7 @@ Restored submissions (completed prerequisites verified through accounting; their
 |Three delayed-spline held-out tests|1145375|
 
 All production chains wait on the corrected GPU checks. Original records/results remain intact; these replacements retain all nine comparison arms. Authoritative recovery record: `experiments/ixi_transfer/probe-recovery-20261015.json`; reproducible submission script: `cluster/jean_zay/resubmit_ixi_after_probe_fix.py`.
+
+### Status 2026-10-16
+
+All six pretrainings completed through epoch 50. Four fine-tuned models completed so far: IXI straight, plants straight, IXI delayed spline, plants delayed spline. Three corresponding tests completed. Test 1145372_0 (IXI straight) failed before Python inference: runtime archive extraction exhausted `/tmp` on jzxh163. Resubmitted only this test as **1160089_0**, excluding that node. Training/checkpoint results are intact. Other IXI fine-tunings are running or waiting normally; no additional failures observed in this check.

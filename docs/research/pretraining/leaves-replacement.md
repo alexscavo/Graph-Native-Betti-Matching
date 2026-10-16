@@ -88,3 +88,7 @@ New held-out evaluation uses all 13,071 original test IDs, verified against the 
 - Future final tables: `docs/research/pretraining/source-transfer-results/test-comparison.md` and `test-comparison.csv` (created only after all tests succeed).
 
 Static checks passed; all six configuration checks and full test membership checks passed. GPU evaluations were submitted and results are pending. Existing validation outputs were reused without repeated inference.
+
+### Held-out tests completed (2026-10-16)
+
+All six evaluations 1145698 and comparison job 1145699 completed successfully on the same 13,071 test patches. Full results: [test table](source-transfer-results/test-comparison.md), [CSV](source-transfer-results/test-comparison.csv). Spline edge F1: leaves 0.6905, plants 0.6879, MRI-only 0.7258; curve F1: 0.4607, 0.4581, 0.5097. Leaves and plants remain close, without a consistent overall winner; MRI-only is stronger on detection and curve recovery. These are one-seed comparisons, not significance tests. Combined-source results remain pending.

@@ -3,6 +3,17 @@
 This directory is the canonical home for the representation and evaluation
 work that follows the ordered research roadmap.
 
+## Current experiments and storage (2026-10-16)
+
+- [Experiment navigation](../../experiments/README.md): current source-transfer comparisons and augmentation prototypes.
+- [Retained experiment register](storage/retained-experiments.md): why each scientific run remains useful.
+- [Cleanup and retention report](storage/cleanup-20261016.md): deleted material, verified archives and restore instructions.
+- [Completed 300-epoch detached-spline comparison](spline_learning/scratch-extension-300.md).
+- [SyntheticMRI source-transfer comparison](pretraining/combined-transfer-results/test-comparison.md), [IXI source-transfer protocol](pretraining/ixi-transfer.md).
+- [Latest textured-background prototypes](pretraining/textured-source-prototype.md).
+
+Dated launch records below are historical evidence, not live scheduler status.
+
 ## Documents
 
 - [`vascular_graph_roadmap.md`](vascular_graph_roadmap.md) — ordered phases and

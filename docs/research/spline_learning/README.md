@@ -1,8 +1,13 @@
 # Continuous vessel graph experiments
 
-Latest investigation: [local CNN information for geometry](local-geometry-diagnostic.md), submitted 871744_0/1/2 with a SyntheticMRI curvature audit and IXI caveat, following the [completed full validation comparison](full-validation-comparison.md) with tables and an offline gallery.
+## Current status (2026-10-16)
 
-**Current learning run:** GT extraction completed; training and all 13,071 eligible test patches are complete; test logging was recovered and uploaded to W&B. Start with [the current training report](spline-10k-training.md). The interactive pages below are reference prototypes.
+The scratch 300-epoch and source-transfer comparisons are complete. Start with
+[the final scratch results](scratch-extension-300.md), [source-transfer results](../pretraining/combined-transfer-results/test-comparison.md), and [the current experiment map](../../../experiments/README.md).
+The current exploratory work is [nonplanar plant embedding](../pretraining/nonplanar-source-prototype.md) and [textured backgrounds](../pretraining/textured-source-prototype.md); these are visual prototypes, not validated training improvements.
+
+Earlier feasibility, collapse and unfreezing experiments below are retained evidence.
+[Storage/retention report](../storage/cleanup-20261016.md).
 
 For the real-image follow-up, see [the IXI patch experiment](ixi_patch.md), with MRI context, uncertain centerline guides, mask support, and a portable 3D viewer.
 
@@ -12,7 +17,7 @@ For the learning implementation, decisions, target preparation and experiment st
 
 For the main-method selection, see [V0/V1 verification and decision](spline-approach-selection.md). For the expanded experiment, boundary handling, W&B projections and launch status, see [the 10k training protocol](spline-10k-training.md).
 
-Open [2d.html](../experiments/2d.html) or [3d.html](../experiments/3d.html) directly in a browser. Both are offline pages with no build or external dependency. In 3D, drag to rotate and scroll to zoom.
+Open [2d.html](../../../../graph-representation/experiments/2d.html) or [3d.html](../../../../graph-representation/experiments/3d.html) directly in a browser. Both are offline pages with no build or external dependency. In 3D, drag to rotate and scroll to zoom.
 
 ## Question
 
@@ -39,7 +44,7 @@ The displayed mean symmetric curve distance averages each sampled point's closes
 3. Compare error against geometry values per edge; look for a useful elbow rather than demanding zero error.
 4. In 3D, rotate the same fit to inspect depth error that is hidden in one projection.
 
-The source rationale is in [vascular_graph_representation.md](../../Graph-Native-Betti-Matching/docs/research/vascular_graph_representation.md), especially the function-valued edge section. The [research roadmap](../../Graph-Native-Betti-Matching/docs/research/vascular_graph_roadmap.md) places this as exploratory Phase 13 after the adaptive-node work. Those source documents remain in their project's canonical research directory; documentation specific to this experiment lives here.
+The source rationale is in [vascular_graph_representation.md](../vascular_graph_representation.md), especially the function-valued edge section. The [research roadmap](../vascular_graph_roadmap.md) places this as exploratory Phase 13 after the adaptive-node work. Those source documents remain in their project's canonical research directory; documentation specific to this experiment lives here.
 
 ## Current work (2026-10-06)
 

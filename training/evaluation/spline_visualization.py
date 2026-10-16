@@ -9,7 +9,7 @@ from data.loaders import build_evaluation_loader
 from .inference import infer_graphs
 
 
-def draw_projections(image, mask, nodes, guides, prediction, path, title):
+def draw_projections(image, mask, nodes, guides, prediction, path, title, prediction_label="Decoded prediction"):
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
@@ -36,7 +36,7 @@ def draw_projections(image, mask, nodes, guides, prediction, path, title):
                 ax.plot(coords[:, horizontal], coords[:, vertical], color=color, lw=1.2)
             anchors = np.asarray(anchors).reshape(-1, 3)*shape
             ax.scatter(anchors[:, horizontal], anchors[:, vertical], color=color, s=15)
-            ax.set_title(('Original guide' if row == 0 else 'Decoded prediction') + ' · projection along ' + 'DHW'[omitted])
+            ax.set_title(('Original guide' if row == 0 else prediction_label) + ' · projection along ' + 'DHW'[omitted])
             ax.set_xlabel('DHW'[horizontal]+' (voxels)'); ax.set_ylabel('DHW'[vertical]+' (voxels)')
             ax.set_xlim(-.5, shape[horizontal]-.5); ax.set_ylim(-.5, shape[vertical]-.5)
     fig.suptitle(title+' · mask is reference; projected crossings need not be junctions')

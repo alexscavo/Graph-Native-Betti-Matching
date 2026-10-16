@@ -154,3 +154,9 @@ Each continuation archives the old final/best validation outputs, test outputs, 
 All SyntheticMRI leaf/plant/MRI-only runs already reached 100. Combined straight is finishing its epoch-100 evaluation; combined spline is complete. Active IXI spline was at epoch95 with best70 and active SyntheticMRI→IXI straight at epoch90 with best85: neither can stop before epoch100 under its already-loaded policy. Pending IXI continuation jobs will read the updated disabled-stop configuration at launch. Thus no running training needed cancellation.
 
 Verification: Python/shell syntax checks and direct execution of each runner's stopping expression passed (disabled policy cannot trigger; enabled legacy behavior still works). Existing successful training smoke tests cover the unchanged forward/backward/continuation path. Submission record: `experiments/ixi_transfer/full-budget-20261016.json`.
+
+### Disk recovery and completion check (2026-10-16 12:55 Paris)
+
+Two jobs remained nominally RUNNING after their DataLoader workers failed creating `/tmp/pymp-*` on jzxh163. The node was already administratively DRAINed for a full directory. Cancelled only these blocked jobs (1145371_1 and combined 1147571_0), then resumed their saved states on other nodes. IXI recovery 1165756 and test 1165758 completed; combined recovery 1165760 completed and test 1165761 is running. Replacement combined report job 1165762 waits on that test. Exact commands are preserved in `experiments/ixi_transfer/disk-recovery-20261016.json`.
+
+Eight IXI arms are at epoch100; plants_spline continuation 1165050_1 is at epoch90. Six updated IXI held-out tests are complete; SyntheticMRI-source spline/delayed tests 1145372_5 and 1145375_4 are pending. Reduced those pending tests' requested walltimes from20h to30min based on observed4–6min evaluation runtimes; model/evaluation settings unchanged. Current scheduler estimate is Oct17 08:44 but may move after the shorter reservations are considered.

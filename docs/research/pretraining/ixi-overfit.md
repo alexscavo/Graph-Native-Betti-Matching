@@ -43,3 +43,16 @@ The initial pretrained spline prediction was also inspected for `sample_000100_0
 Initial two-update GPU smoke tests 1164010 passed for both arms. Production launch 1164011 failed before updates because the new caller omitted `build_tracker(..., resume=False)`. Fixed the required argument and now exercise W&B during smoke too. Preserved initial directories under `initial-attempt-*`; no learned checkpoint overwritten. Replacement smoke array **1164572**, paired overfit array **1164573** (success-gated). Recovery commands/IDs are recorded in `experiments/ixi_overfit/recovery.json`.
 
 CPU previews succeeded with the fixed runtime after restricting source discovery to the two displayed records; no need to scan/load all source patches. See [source embedding](ixi-overfit-previews/source-embedding.png) and the four reference PNGs in the same folder. The input-audit panels are explicitly labelled image/mask-only, not predictions.
+
+## Completed diagnostic — 2026-10-16
+
+Both replacement smoke tests and both 1,000-update jobs completed successfully (straight 2m55s, spline 3m30s). These are four fitting patches and four disjoint monitoring patches, with pretrained initialization.
+
+| Arm | Train total loss, initial → final | Val total loss, initial → final | Final train node F1 | Final train edge F1 | Train curve F1 | Same-endpoint chord F1 | Final val edge F1 |
+|---|---|---|---:|---:|---:|---:|---:|
+|Straight|2.4292 → 0.0292|3.4769 → 8.4953|1.0000|1.0000|0.5952|0.5952|0.0988|
+|Spline|2.8199 → 0.1122|3.9079 → 9.4349|0.9688|0.9000|0.8959|0.5323|0.1370|
+
+Loss magnitudes across arms include different objectives and should not be interpreted as a direct ranking. Within each arm, train loss falls while validation loss rises: clear memorization/overfitting on this intentionally tiny set. The pretrained network can fit these real inputs and reference graphs; the spline can recover curved geometry much better than same-endpoint chords. This rules out a blanket inability to fit these examples, not dataset-wide annotation problems, scratch-training difficulties, or optimization issues on larger populations. It does not establish that the full-data runs' weakness has exactly the same cause.
+
+Final straight and spline prediction renders for `sample_000100_0033` were directly inspected: straight edges cut across curved reference paths; learned splines follow them substantially better, with some residual graph errors. Full initial/final render sets are in each run's `previews/` folder. Validation scores on four examples are illustrative only.

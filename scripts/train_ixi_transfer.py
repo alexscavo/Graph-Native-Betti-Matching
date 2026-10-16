@@ -227,7 +227,7 @@ def main():
                 if a.smoke and batch_index==2:break
             if a.smoke or epoch%plan['monitor_epochs']==0 or epoch==limit:
                 monitor()
-                stop=not pretrain and epoch>=plan['min_finetune_epochs'] and epoch-best_epoch>=plan['patience_epochs']
+                stop=plan.get('early_stopping',True) and not pretrain and epoch>=plan['min_finetune_epochs'] and epoch-best_epoch>=plan['patience_epochs']
             atomic_checkpoint(out/'latest.pt',payload())
             if stop or a.smoke:break
         complete=stop or epoch==cfg['training']['epochs']

@@ -136,3 +136,21 @@ All production chains wait on the corrected GPU checks. Original records/results
 ### Status 2026-10-16
 
 All six pretrainings completed through epoch 50. Four fine-tuned models completed so far: IXI straight, plants straight, IXI delayed spline, plants delayed spline. Three corresponding tests completed. Test 1145372_0 (IXI straight) failed before Python inference: runtime archive extraction exhausted `/tmp` on jzxh163. Resubmitted only this test as **1160089_0**, excluding that node. Training/checkpoint results are intact. Other IXI fine-tunings are running or waiting normally; no additional failures observed in this check.
+
+### Fixed 100-epoch budget — user decision 2026-10-16
+
+Disable patience-based early stopping for all current source-transfer comparison configurations (IXI, plants, leaves, combined and MRI-only controls). Pretraining remains 50 epochs. Fine-tuning now always runs through epoch 100; validation still selects `best.pt` using the unchanged branch-F1/edge-F1 rule. This changes stopping, not checkpoint selection, data, loss weights or learning-rate schedule.
+
+Three IXI arms previously completed early and are resumed from `latest.pt`, restoring optimizer, scheduler and RNG:
+
+| Arm | Previous stopping epoch | Continuation/test task |
+|---|---:|---|
+|plants_straight|45|1165050_0|
+|plants_spline|35|1165050_1|
+|plants_delayed_spline|65|1165050_2|
+
+Each continuation archives the old final/best validation outputs, test outputs, completion marker, summary and provenance under `early-stopped-epoch<N>/`. A hard link preserves the earlier best checkpoint without duplicating its payload; training saves replace checkpoints atomically. Histories remain append-only. The run then completes epoch 100 and tests the validation-selected checkpoint again. Earlier reported test results remain historical early-stopping results until replacement tests complete.
+
+All SyntheticMRI leaf/plant/MRI-only runs already reached 100. Combined straight is finishing its epoch-100 evaluation; combined spline is complete. Active IXI spline was at epoch95 with best70 and active SyntheticMRI→IXI straight at epoch90 with best85: neither can stop before epoch100 under its already-loaded policy. Pending IXI continuation jobs will read the updated disabled-stop configuration at launch. Thus no running training needed cancellation.
+
+Verification: Python/shell syntax checks and direct execution of each runner's stopping expression passed (disabled policy cannot trigger; enabled legacy behavior still works). Existing successful training smoke tests cover the unchanged forward/backward/continuation path. Submission record: `experiments/ixi_transfer/full-budget-20261016.json`.

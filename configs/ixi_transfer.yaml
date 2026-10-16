@@ -29,3 +29,6 @@ domain_adaptation:
   learning_rate: 7.0e-05
 ixi_root: /lustre/fsn1/projects/rech/vnc/upz25mj/datasets/IXI/transfer_splines_k8_20261015
 synthetic_root: /lustre/fsn1/projects/rech/vnc/upz25mj/datasets/syntheticMRI/transfer_source_k8_25k_20261015
+
+# Fixed fine-tuning budget; validation still selects the best checkpoint.
+early_stopping: false

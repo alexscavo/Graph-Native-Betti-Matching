@@ -27,3 +27,6 @@ domain_adaptation:
   - 0.05
   - 0.95
   learning_rate: 7.0e-05
+
+# Fixed fine-tuning budget; validation still selects the best checkpoint.
+early_stopping: false

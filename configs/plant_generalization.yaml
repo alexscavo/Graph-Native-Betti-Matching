@@ -17,3 +17,6 @@ spline_weight: 1.4739989612791453
 learning_rate: 0.00007
 tracking_group: plant-generalization-20261014
 augmentation: {rotate_90: true, gaussian_noise_probability: 0.35, gaussian_noise_max_std: 0.015, zoom: false}
+
+# Fixed fine-tuning budget; validation still selects the best checkpoint.
+early_stopping: false

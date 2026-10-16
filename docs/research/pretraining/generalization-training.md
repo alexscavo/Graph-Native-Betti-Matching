@@ -79,3 +79,6 @@ Verification1069024 completed successfully,14m47s. Batch32 mixed 3-step GPU smok
 Fresh chain1069042_0/1 completed its25epoch stage from random initialization, batch32, domain weight1.0 in mixed arm. Continuation1069043_0/1 is running to epoch50. Fine-tuning arrays1069044 and1069045 are submitted with verified dependencies on those stages; scheduler inspection confirms they wait on1069043, then1069044. They will initialize only from the new pretraining checkpoints. Superseded0.1/batch4 jobs were cancelled and are not dependencies.
 
 Job records and verified configuration: `experiments/plant_pretraining/submissions/20261014-da-b32-w1-restart.json`, `configs/plant_generalization_da_b32.yaml`.
+### 2026-10-16: disable patience-based early stopping
+
+User requested fixed 100-epoch fine-tuning for comparison. `early_stopping: false` is now explicit in plant, leaf, combined and IXI plans; best-checkpoint selection is unchanged. Completed SyntheticMRI source-comparison runs already reached 100, so they need no retraining. Three early-stopped IXI runs are resumed and retested; see `ixi-transfer.md` for job IDs and archived earlier outputs.

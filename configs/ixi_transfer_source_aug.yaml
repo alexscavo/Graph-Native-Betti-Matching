@@ -1,0 +1,40 @@
+base_config: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/scratch_extend300_20261012/detached_spline/epoch300/resolved-config.yaml
+population_manifest: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/scratch_comparison_10k_300ep/comparison-manifest.json
+evaluation_membership_run: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/runs/frozen_followup_20261009/residual_continue
+output_root: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/ixi_transfer_20261015_source_aug_20261016
+plant_root: /lustre/fsn1/projects/rech/vnc/upz25mj/experiments/gnbm/spline_learning/plant_generalization_20261014/plants-k8
+seed: 364505
+pretrain_epochs: 50
+finetune_epochs: 100
+pretrain_draws_per_epoch: 50000
+batch_size: 32
+workers: 4
+monitor_epochs: 5
+patience_epochs: 30
+min_finetune_epochs: 30
+spline_weight: 1.4739989612791453
+learning_rate: 7.0e-05
+tracking_group: ixi-transfer-both-stages-20261015-source-aug-20261016
+augmentation:
+  rotate_90: true
+  gaussian_noise_probability: 0.35
+  gaussian_noise_max_std: 0.015
+  zoom: false
+domain_adaptation:
+  enabled: true
+  weight: 1.0
+  class_weights:
+  - 0.05
+  - 0.95
+  learning_rate: 7.0e-05
+ixi_root: /lustre/fsn1/projects/rech/vnc/upz25mj/datasets/IXI/transfer_splines_k8_20261015
+synthetic_root: /lustre/fsn1/projects/rech/vnc/upz25mj/datasets/syntheticMRI/transfer_source_k8_25k_20261015
+
+# Fixed fine-tuning budget; validation still selects the best checkpoint.
+early_stopping: false
+
+# Separate visual-prototype policy; learning benefit not established.
+source_augmentation:
+  enabled: true
+  nonplanar: true
+  textured_soft: true

@@ -10,7 +10,7 @@ work that follows the ordered research roadmap.
 - [Cleanup and retention report](storage/cleanup-20261016.md): deleted material, verified archives and restore instructions.
 - [Completed 300-epoch detached-spline comparison](spline_learning/scratch-extension-300.md).
 - [SyntheticMRI source-transfer comparison](pretraining/combined-transfer-results/test-comparison.md), [IXI source-transfer protocol](pretraining/ixi-transfer.md).
-- [Latest textured-background prototypes](pretraining/textured-source-prototype.md).
+- [Latest textured-background prototypes](pretraining/textured-source-prototype.md) and [training integration/checks](pretraining/source-augmentation-training.md).
 
 Dated launch records below are historical evidence, not live scheduler status.
 

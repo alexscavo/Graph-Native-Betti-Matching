@@ -45,6 +45,7 @@ def configuration(plan, arm):
     if mixed:
         cfg['data']['datasets']['plants']=dict(role='source',root=plan['plant_root'],train_samples=None,validation_samples=None,coordinate_order_on_disk=['y','x'])
     cfg['data']['mixed_sampling'].update(balance_source_target=True,epoch_size='twice_source')
+    cfg['augmentation']['plants']['source_augmentation']=copy.deepcopy(plan.get('source_augmentation', {}))
     aug=cfg['augmentation']['synthetic_mri'];aug['rotate_90']['enabled']=True;aug['zoom']['enabled']=False
     aug['gaussian_noise'].update(enabled=True,probability=.35,std_range=[0.,.015]);aug['intensity_clamp']=None
     domain=plan.get('domain_adaptation',{})

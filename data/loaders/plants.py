@@ -41,6 +41,7 @@ class PlantsDataset(Dataset):
         size: int = 64,
         padding: int = 5,
         projection_depth: int = 5,
+        source_augmentation=None,
         spline_controls=None,
         virtual_voxel_mm: float = 1.0,
         augment: bool = False,
@@ -71,6 +72,10 @@ class PlantsDataset(Dataset):
         self.padding = int(padding)
         self.inner_size = self.size - 2 * self.padding
         self.projection_depth = int(projection_depth)
+        self.source_augmentation = dict(source_augmentation or {})
+        unknown = set(self.source_augmentation) - {'enabled', 'nonplanar', 'textured_soft'}
+        if unknown:
+            raise ValueError(f'Unknown source augmentation options: {sorted(unknown)}')
         self.augment = bool(augment)
         self.rotate_90 = bool(rotate_90)
         self.flip_probability = tuple(float(value) for value in flip_probability)
@@ -176,6 +181,9 @@ class PlantsDataset(Dataset):
                 if not np.allclose(cache['nodes'], nodes.numpy(), atol=1e-6) or not np.array_equal(cache['edges'], edges.numpy()):
                     raise ValueError(f'Plant spline cache / graph mismatch: {record.sample_id}')
                 geometry = {k: torch.from_numpy(cache[k].copy()) for k in ('controls','curves','guides')}
+                if self.augment and self.source_augmentation.get('enabled', False):
+                    for key in ('full_paths', 'path_offsets'):
+                        geometry[key] = torch.from_numpy(cache[key].copy())
             if geometry['controls'].shape != (len(edges), int(self.spline_controls), 3):
                 raise ValueError('Plant spline control count mismatch')
 
@@ -191,6 +199,21 @@ class PlantsDataset(Dataset):
             segmentation.new_tensor(-0.5),
         )
         parameters = self._augmentation_parameters()
+        if self.augment and self.source_augmentation.get('enabled', False):
+            import numpy as np
+            from data.source_augmentation import augment_source
+            from data.spline_augmentation import project_plant_geometry
+            if geometry is not None:
+                offsets = geometry['path_offsets']
+                geometry = project_plant_geometry(geometry, AugmentationParameters(),
+                    self.inner_size, self.size, self.padding, self.virtual_voxel_mm)
+                geometry['path_offsets'] = offsets
+            image, segmentation, nodes, geometry = augment_source(
+                self.pad(self.scale(image)), self.pad(segmentation),
+                (nodes*self.inner_size+self.padding)/self.size, geometry, parameters,
+                np.random.default_rng(self.rng.getrandbits(63)), self.source_augmentation)
+            return ([image], [segmentation], [nodes], [edges],
+                    [geometry if geometry is not None else z_position], [self.domain_label])
         transformed = apply_augmentation(image, segmentation, nodes, parameters)
         if geometry is not None:
             from data.spline_augmentation import project_plant_geometry

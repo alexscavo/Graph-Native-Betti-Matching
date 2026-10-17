@@ -6,7 +6,7 @@ Keep code and compact provenance here; large volumes, checkpoints and prediction
 
 | Folder / report | Role |
 | --- | --- |
-| `source_augmentation/` | Two-sample nonplanar and textured-background prototypes; not yet training augmentations |
+| `source_augmentation/` | Nonplanar/textured prototypes and opt-in training integration; loader checks passed, no augmented training yet |
 | `plant_pretraining/`, `leaf_pretraining/`, `combined_pretraining/` | SyntheticMRI source-transfer launch records; final comparison in `docs/research/pretraining/combined-transfer-results/` |
 | `ixi_transfer/` | IXI-only / plants+IXI / SyntheticMRI+IXI comparison; straight, spline throughout and delayed spline |
 | `ixi_overfit/` | Four-patch IXI learnability diagnostic |

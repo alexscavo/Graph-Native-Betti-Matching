@@ -146,6 +146,7 @@ def _dataset_for_split(
             size=int(image_size[0]),
             padding=padding,
             projection_depth=int(plants_augmentation["projection_depth"]),
+            source_augmentation=plants_augmentation.get("source_augmentation"),
             spline_controls=settings.get("spline_controls"),
             virtual_voxel_mm=float(settings.get("virtual_voxel_mm", 1.0)),
             rotate_90=bool(plants_augmentation["rotate_90"]["enabled"]),
